@@ -1,4 +1,4 @@
-package click.dailyfeed.content.domain.post.repository;
+package click.dailyfeed.content.domain.post.repository.jpa;
 
 import click.dailyfeed.content.domain.post.entity.PostActivityHistory;
 import org.springframework.data.jpa.repository.JpaRepository;

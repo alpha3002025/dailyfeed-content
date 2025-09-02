@@ -19,8 +19,16 @@ spring:
   devtools:
     restart:
       enabled: false
-  ## paging ??
   data:
+    ## mongodb
+    mongodb:
+      host: ${MONGODB_HOST:localhost}
+      port: ${MONGODB_PORT:27017}
+      username: ${MONGODB_USER:dailyfeed-search}
+      password: ${MONGODB_PASSWORD:hitEnter!!!}
+      protocol: mongodb # mongodb+srv or mongodb (atlas ??? mongodb+srv)
+      uri: mongodb://dailyfeed-search:hitEnter!!!@localhost/dailyfeed
+    ## paging ??
     web:
       pageable:
         max-page-size: 100
@@ -53,3 +61,27 @@ dailyfeed:
     comment:
       max-depth: 2    # ?? ?? ??
       page-size: 20   # ?? ??? ??
+app:
+  services:
+    member:
+      url: ${MEMBER_SERVICE_URL:http://localhost:8081}
+      timeout:
+        connect: 5000
+        read: 10000
+    timeline:
+      url: ${TIMELINE_SERVICE_URL:http://localhost:8082}
+      timeout:
+        connect: 5000
+        read: 10000
+    content:
+      url: ${CONTENT_SERVICE_URL:http://localhost:8083}
+      timeout:
+        connect: 5000
+        read: 10000
+      mongodb:
+        database: dailyfeed
+    search:
+      url: ${SEARCH_SERVICE_URL:http://localhost:8083}
+      timeout:
+        connect: 5000
+        read: 10000

@@ -1,4 +1,4 @@
-package click.dailyfeed.content.domain.comment.repository;
+package click.dailyfeed.content.domain.comment.repository.jpa;
 
 import click.dailyfeed.content.domain.comment.entity.Comment;
 import click.dailyfeed.content.domain.post.entity.Post;
