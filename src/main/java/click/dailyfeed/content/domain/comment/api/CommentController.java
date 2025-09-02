@@ -1,0 +1,124 @@
+package click.dailyfeed.content.domain.comment.api;
+
+import click.dailyfeed.code.domain.content.comment.dto.CommentDto;
+import click.dailyfeed.code.global.web.response.DailyfeedPageResponse;
+import click.dailyfeed.code.global.web.response.DailyfeedServerResponse;
+import click.dailyfeed.content.domain.comment.service.CommentService;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.web.bind.annotation.*;
+
+@Slf4j
+@RequiredArgsConstructor
+@RequestMapping("/api/comments")
+@RestController
+public class CommentController {
+    private final CommentService commentService;
+
+    // 댓글 작성
+    @PostMapping
+    public DailyfeedServerResponse<CommentDto.Comment> createComment(
+            @RequestHeader("Authorization") String authorizationHeader,
+            HttpServletResponse httpResponse,
+            @Valid @RequestBody CommentDto.CreateCommentRequest request) {
+        return commentService.createComment(authorizationHeader, request, httpResponse);
+    }
+
+    // 댓글 수정
+    @PutMapping("/{commentId}")
+    public DailyfeedServerResponse<CommentDto.Comment> updateComment(
+            @RequestHeader("Authorization") String authorizationHeader,
+            HttpServletResponse httpResponse,
+            @PathVariable Long commentId,
+            @Valid @RequestBody CommentDto.UpdateCommentRequest request) {
+        return commentService.updateComment(commentId, authorizationHeader, request, httpResponse);
+    }
+
+    // 댓글 삭제
+    @DeleteMapping("/{commentId}")
+    public DailyfeedServerResponse<Boolean> deleteComment(
+            @RequestHeader("Authorization") String authorizationHeader,
+            HttpServletResponse httpResponse,
+            @PathVariable Long commentId
+    ) {
+        return commentService.deleteComment(commentId, authorizationHeader, httpResponse);
+    }
+
+    // 댓글 상세 조회
+    @GetMapping("/{commentId}")
+    public DailyfeedServerResponse<CommentDto.Comment> getComment(
+            HttpServletResponse httpResponse,
+            @PathVariable Long commentId) {
+        return commentService.getComment(commentId, httpResponse);
+    }
+
+    // 특정 게시글의 댓글 목록 조회 (계층구조)
+    @GetMapping("/post/{postId}/list")
+    public DailyfeedPageResponse<CommentDto.Comment> getCommentsByPostWithoutPaging(
+            HttpServletResponse httpResponse,
+            @PathVariable Long postId) {
+        return commentService.getCommentsByPost(postId, httpResponse);
+    }
+
+    // 참고)
+    // Post Controller 내에서 구성하는게 이론적으로는 적절하지만,
+    // 게시글 서비스와 댓글 서비스간의 경계를 구분하기로 결정했기에 댓글 관리의 주체를 CommentController 로 지정
+    // 특정 게시글의 댓글 목록을 페이징으로 조회
+    @GetMapping("/post/{postId}")
+    public DailyfeedPageResponse<CommentDto.Comment> getCommentsByPost(
+            HttpServletResponse httpResponse,
+            @PathVariable Long postId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return commentService.getCommentsByPostWithPaging(postId, page, size, httpResponse);
+    }
+
+    // 특정 사용자의 댓글 목록
+    @GetMapping("/user/{userId}")
+    public DailyfeedPageResponse<CommentDto.CommentSummary> getCommentsByUser(
+            HttpServletResponse httpResponse,
+            @PathVariable Long userId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return commentService.getCommentsByUser(userId, page, size, httpResponse);
+    }
+
+    // 내 댓글 목록
+    @GetMapping("/my")
+    public DailyfeedPageResponse<CommentDto.CommentSummary> getMyComments(
+            HttpServletResponse httpResponse,
+            @RequestHeader("Authorization") String authorizationHeader,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return commentService.getMyComments(authorizationHeader, page, size, httpResponse);
+    }
+
+    // 대댓글 목록 조회
+    @GetMapping("/{commentId}/replies")
+    public DailyfeedPageResponse<CommentDto.Comment> getRepliesByParent(
+            HttpServletResponse httpResponse,
+            @PathVariable Long commentId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return commentService.getRepliesByParent(commentId, page, size, httpResponse);
+    }
+
+    // 댓글 좋아요
+    @PostMapping("/{commentId}/like")
+    public DailyfeedServerResponse<Boolean> likeComment(@PathVariable Long commentId) {
+        log.info("Liking comment: {}", commentId);
+        commentService.incrementLikeCount(commentId);
+        return DailyfeedServerResponse.<Boolean>builder().ok("Y").statusCode("201").reason("LIKE_CREATED").data(Boolean.TRUE).build();
+    }
+
+    // 댓글 좋아요 취소
+    @DeleteMapping("/{commentId}/like")
+    public DailyfeedServerResponse<Boolean> cancelLikeComment(@PathVariable Long commentId) {
+        log.info("Unliking comment: {}", commentId);
+        commentService.decrementLikeCount(commentId);
+        return DailyfeedServerResponse.<Boolean>builder().ok("Y").statusCode("204").reason("LIKE_DELETED").data(Boolean.TRUE).build();
+    }
+
+}

@@ -28,6 +28,9 @@ val querydslVersion = "5.0.0:jakarta"
 val mapstructVersion = "1.5.4.Final"
 
 dependencies {
+    implementation(project(":dailyfeed-code"))
+    implementation(project(":dailyfeed-feign"))
+
     // spring
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-data-mongodb")
@@ -49,6 +52,9 @@ dependencies {
     // lombok
     compileOnly("org.projectlombok:lombok")
     annotationProcessor("org.projectlombok:lombok")
+
+    // springdoc
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.2")
 
     // database
     runtimeOnly("com.h2database:h2")
