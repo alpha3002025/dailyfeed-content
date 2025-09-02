@@ -8,6 +8,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+// TODO (삭제) timeline+contents 서비스로 이관
 @Getter
 @Entity
 @Table(

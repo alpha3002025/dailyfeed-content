@@ -143,11 +143,11 @@ public class CommentService {
 
     // 특정 게시글의 댓글 목록 조회 (계층구조)
     @Transactional(readOnly = true)
-    public DailyfeedPageResponse<CommentDto.Comment> getCommentsByPost(Long postId, HttpServletResponse httpResponse) {
+    public DailyfeedPageResponse<CommentDto.Comment> getCommentsByPost(Long postId, Pageable pageable, HttpServletResponse httpResponse) {
         Post post = postRepository.findByIdAndNotDeleted(postId)
                 .orElseThrow(PostNotFoundException::new);
 
-        Page<Comment> topLevelComments = commentRepository.findCommentHierarchyByPost(post);
+        Page<Comment> topLevelComments = commentRepository.findCommentHierarchyByPost(post, pageable);
 
         // 모든 댓글(자식 포함)의 작성자 정보 추가
         DailyfeedPage<CommentDto.Comment> updatedCommentPage = updateCommentsAuthorsRecursively(topLevelComments, httpResponse);

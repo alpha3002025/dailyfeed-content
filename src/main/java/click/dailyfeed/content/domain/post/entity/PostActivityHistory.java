@@ -11,6 +11,7 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
 
+// TODO (삭제) timeline+contents 서비스로 이관
 @Entity
 @Table(name = "post_activity_history")
 @Getter
@@ -33,7 +34,7 @@ public class PostActivityHistory {
     private PostActivityType activityType;
 
     @CreatedDate
-    @Column(name = "created_date", nullable = false)
+    @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
     @Builder(builderMethodName = "insertBuilder")

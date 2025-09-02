@@ -8,6 +8,9 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.web.bind.annotation.*;
 
 @Slf4j
@@ -58,8 +61,14 @@ public class CommentController {
     @GetMapping("/post/{postId}/list")
     public DailyfeedPageResponse<CommentDto.Comment> getCommentsByPostWithoutPaging(
             HttpServletResponse httpResponse,
-            @PathVariable Long postId) {
-        return commentService.getCommentsByPost(postId, httpResponse);
+            @PathVariable Long postId,
+            @PageableDefault(
+                    page = 0,
+                    size = 10,
+                    sort = "createdAt",
+                    direction = Sort.Direction.DESC
+            ) Pageable pageable) {
+        return commentService.getCommentsByPost(postId, pageable, httpResponse);
     }
 
     // 참고)
