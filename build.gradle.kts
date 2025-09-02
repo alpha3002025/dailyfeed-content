@@ -4,67 +4,83 @@ plugins {
     id("io.spring.dependency-management") version "1.1.7"
 }
 
-group = "click.dailyfeed"
-version = "0.0.1-SNAPSHOT"
-description = "dailyfeed content"
 
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
+subprojects {
+    apply(plugin = "org.springframework.boot")
+    apply(plugin = "io.spring.dependency-management")
+}
+
+allprojects {
+    group = "click.dailyfeed"
+    version = "0.0.1-SNAPSHOT"
+    description = "dailyfeed content"
+
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(17)
+        }
     }
-}
 
-configurations {
-    compileOnly {
-        extendsFrom(configurations.annotationProcessor.get())
+    configurations {
+        compileOnly {
+            extendsFrom(configurations.annotationProcessor.get())
+        }
     }
-}
 
-repositories {
-    mavenCentral()
-}
+    repositories {
+        mavenCentral()
+    }
 
-val querydslVersion = "5.0.0:jakarta"
-val mapstructVersion = "1.5.4.Final"
+    extra["springCloudVersion"] = "2025.0.0"
 
-dependencies {
-    implementation(project(":dailyfeed-code"))
-    implementation(project(":dailyfeed-feign"))
+    val querydslVersion = "5.0.0:jakarta"
+    val mapstructVersion = "1.5.4.Final"
 
-    // spring
-    implementation("org.springframework.boot:spring-boot-starter-data-jpa")
-    implementation("org.springframework.boot:spring-boot-starter-data-mongodb")
-    implementation("org.springframework.boot:spring-boot-starter-validation")
-    implementation("org.springframework.boot:spring-boot-starter-web")
+    dependencyManagement {
+        imports {
+            mavenBom("org.springframework.cloud:spring-cloud-dependencies:${property("springCloudVersion")}")
+        }
+    }
 
-    // jakarta
-    annotationProcessor("jakarta.annotation:jakarta.annotation-api")
-    annotationProcessor("jakarta.persistence:jakarta.persistence-api")
+    dependencies {
+        implementation(project(":dailyfeed-code"))
+        implementation(project(":dailyfeed-feign"))
 
-    // mapstruct
-    implementation("org.mapstruct:mapstruct:${mapstructVersion}")
-    annotationProcessor("org.mapstruct:mapstruct-processor:${mapstructVersion}")
+        // spring
+        implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+        implementation("org.springframework.boot:spring-boot-starter-data-mongodb")
+        implementation("org.springframework.boot:spring-boot-starter-validation")
+        implementation("org.springframework.boot:spring-boot-starter-web")
 
-    // querydsl
-    implementation ("com.querydsl:querydsl-jpa:${querydslVersion}")
-    annotationProcessor("com.querydsl:querydsl-apt:${querydslVersion}")
+        // jakarta
+        annotationProcessor("jakarta.annotation:jakarta.annotation-api")
+        annotationProcessor("jakarta.persistence:jakarta.persistence-api")
 
-    // lombok
-    compileOnly("org.projectlombok:lombok")
-    annotationProcessor("org.projectlombok:lombok")
+        // mapstruct
+        implementation("org.mapstruct:mapstruct:${mapstructVersion}")
+        annotationProcessor("org.mapstruct:mapstruct-processor:${mapstructVersion}")
 
-    // springdoc
-    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.2")
+        // querydsl
+        implementation ("com.querydsl:querydsl-jpa:${querydslVersion}")
+        annotationProcessor("com.querydsl:querydsl-apt:${querydslVersion}")
 
-    // database
-    runtimeOnly("com.h2database:h2")
-    runtimeOnly("com.mysql:mysql-connector-j")
+        // lombok
+        compileOnly("org.projectlombok:lombok")
+        annotationProcessor("org.projectlombok:lombok")
 
-    // test
-    testImplementation("org.springframework.boot:spring-boot-starter-test")
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-}
+        // springdoc
+        implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.2")
 
-tasks.withType<Test> {
-    useJUnitPlatform()
+        // database
+        runtimeOnly("com.h2database:h2")
+        runtimeOnly("com.mysql:mysql-connector-j")
+
+        // test
+        testImplementation("org.springframework.boot:spring-boot-starter-test")
+        testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    }
+
+    tasks.withType<Test> {
+        useJUnitPlatform()
+    }
 }
