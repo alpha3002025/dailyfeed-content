@@ -48,9 +48,12 @@ allprojects {
 
         // spring
         implementation("org.springframework.boot:spring-boot-starter-data-jpa")
-        implementation("org.springframework.boot:spring-boot-starter-data-mongodb")
         implementation("org.springframework.boot:spring-boot-starter-validation")
         implementation("org.springframework.boot:spring-boot-starter-web")
+
+        // kafka
+        implementation("org.springframework.kafka:spring-kafka")
+        testImplementation("org.springframework.kafka:spring-kafka-test")
 
         // jakarta
         annotationProcessor("jakarta.annotation:jakarta.annotation-api")
@@ -74,7 +77,6 @@ allprojects {
         // database
         runtimeOnly("com.h2database:h2")
         runtimeOnly("com.mysql:mysql-connector-j")
-        implementation("org.springframework.boot:spring-boot-starter-data-mongodb")
 
         // test
         testImplementation("org.springframework.boot:spring-boot-starter-test")

@@ -4,13 +4,12 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
-import org.springframework.data.mongodb.config.EnableMongoAuditing;
 
 @EnableJpaAuditing
-@EnableMongoAuditing
 @SpringBootApplication
 @ComponentScan(basePackages = {
-        "click.dailyfeed.feign"
+        "click.dailyfeed.feign",
+        "click.dailyfeed.content",
 })
 public class ContentApplication {
 

@@ -20,68 +20,99 @@ spring:
     restart:
       enabled: false
   data:
-    ## mongodb
-    mongodb:
-      host: ${MONGODB_HOST:localhost}
-      port: ${MONGODB_PORT:27017}
-      username: ${MONGODB_USER:dailyfeed-search}
-      password: ${MONGODB_PASSWORD:hitEnter!!!}
-      protocol: mongodb # mongodb+srv or mongodb (atlas ??? mongodb+srv)
-      uri: mongodb://dailyfeed-search:hitEnter!!!@localhost/dailyfeed
     ## paging ??
     web:
       pageable:
         max-page-size: 100
         default-page-size: 20
+  kafka:
+    bootstrap-servers: ${KAFKA_SERVER:localhost:9092}
+    consumer:
+      group-id: post-activity-consumer-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "click.dailyfeed.code.domain.content,click.dailyfeed.code.domain.member"
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      retries: 3
+      batch-size: 16384
+      linger-ms: 1
+      buffer-memory: 33554432
+      properties:
+        spring.json.add.type.headers: false
+        spring.json.trusted.packages: "click.dailyfeed.code.domain.content.post.dto"
 
 springdoc:
-  packages-to-scan: click.dailyfeed.content.domain
+  packages-to-scan: click.dailyfeed.timeline.domain
   default-consumes-media-type: application/json;charset=UTF-8
   default-produces-media-type: application/json;charset=UTF-8
   cache:
-    disabled: true    # ?? ?? ??
+    disabled: true    # 캐시 사용 여부
   api-docs:
     path: /api-docs/json
     groups:
       enabled: true
   swagger-ui:
-    enabled: true               # Swagger enable ?? ??
-    path: /demo-ui.html         # Swagger ?? ??
-    tags-sorter: alpha          # ??? ? Tag ??, method: HTTP Method ? ??
-    operations-sorter: alpha    # ??? ? Tag ??, method: HTTP Method ? ??
+    enabled: true               # Swagger enable 할지 결정
+    path: /demo-ui.html         # Swagger 접근 경로
+    tags-sorter: alpha          # 알파벳 순 Tag 정렬, method: HTTP Method 순 정렬
+    operations-sorter: alpha    # 알파벳 순 Tag 정렬, method: HTTP Method 순 정렬
 
 logging:
   level:
-    click.dailyfeed.member.client: DEBUG
+    click.dailyfeed.timeline.client: DEBUG
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.springframework.kafka: INFO
 
 dailyfeed:
-  member:
-    comment:
-      max-depth: 2    # ?? ?? ??
-      page-size: 20   # ?? ??? ??
-app:
   services:
     member:
-      url: ${MEMBER_SERVICE_URL:http://localhost:8081}
-      timeout:
-        connect: 5000
-        read: 10000
+      feign:
+        url: ${MEMBER_SERVICE_URL:http://localhost:8081}
+        timeout:
+          connect: 5000
+          read: 10000
     timeline:
-      url: ${TIMELINE_SERVICE_URL:http://localhost:8082}
-      timeout:
-        connect: 5000
-        read: 10000
+      feign:
+        url: ${TIMELINE_SERVICE_URL:http://localhost:8082}
+        timeout:
+          connect: 5000
+          read: 10000
     content:
-      url: ${CONTENT_SERVICE_URL:http://localhost:8083}
-      timeout:
-        connect: 5000
-        read: 10000
-      mongodb:
-        database: dailyfeed
+      comment:
+        max-depth: 2    # 댓글 최대 깊이
+        page-size: 20   # 기본 페이지 크기
     search:
-      url: ${SEARCH_SERVICE_URL:http://localhost:8083}
-      timeout:
-        connect: 5000
-        read: 10000
+      feign:
+        url: ${SEARCH_SERVICE_URL:http://localhost:8083}
+        timeout:
+          connect: 5000
+          read: 10000
+infrastructure:
+  mongodb:
+    timeline:
+      database: dailyfeed
+  kafka:
+    topic:
+      post-activity:
+        prefix: post-activity-
+        prefix-date-format: yyyyMMdd
+        retention-ms: 604800000 # 7일
+    consumers:
+      # Post Activity Consumer
+      post-activity:
+        group-id: post-activity-consumer-group
+        concurrency: 3
+      # User Activity Consumer 설정
+      user-activity:
+        group-id: user-activity-consumer-group
+        concurrency: 2
+      # Notification Consumer 설정
+      notification:
+        group-id: notification-consumer-group
+        concurrency: 1

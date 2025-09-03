@@ -7,6 +7,8 @@ import click.dailyfeed.code.domain.content.post.exception.PostUpdateForbiddenExc
 import click.dailyfeed.code.domain.content.post.type.PostActivityType;
 import click.dailyfeed.code.domain.member.member.dto.MemberDto;
 import click.dailyfeed.code.domain.member.member.exception.MemberNotFoundException;
+import click.dailyfeed.code.global.kafka.exception.KafkaException;
+import click.dailyfeed.code.global.kafka.exception.KafkaNetworkErrorException;
 import click.dailyfeed.code.global.web.response.DailyfeedPage;
 import click.dailyfeed.code.global.web.response.DailyfeedPageResponse;
 import click.dailyfeed.code.global.web.response.DailyfeedServerResponse;
@@ -25,10 +27,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -42,9 +46,11 @@ public class PostService {
     private final PostRepository postRepository;
     private final PostLatestActivityRepository postLatestActivityRepository;
     private final PostActivityHistoryRepository postActivityHistoryRepository;
-    private final CommentRepository commentRepository;
     private final PostMapper postMapper;
     private final MemberFeignHelper memberFeignHelper;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
+
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
 
     // 게시글 작성
     public DailyfeedServerResponse<PostDto.Post> createPost(String token, PostDto.CreatePostRequest request, HttpServletResponse response) {
@@ -58,7 +64,9 @@ public class PostService {
         Post post = Post.newPost(request.getTitle(), request.getContent(), authorId);
         Post savedPost = postRepository.save(post);
 
-        loggingPostActivity(authorId, savedPost.getId(), PostActivityType.CREATE);
+        // todo timeline service
+//        loggingPostActivity(authorId, savedPost.getId(), PostActivityType.CREATE);
+        publishPostActivity(authorId, savedPost.getId(), PostActivityType.CREATE);
 
         return DailyfeedServerResponse.<PostDto.Post>builder()
                 .data(postMapper.toPostDto(savedPost, author, 0))
@@ -86,7 +94,9 @@ public class PostService {
         post.updatePost(request.getTitle(), request.getContent());
         Post updatedPost = postRepository.save(post);
 
-        loggingPostActivity(author.getId(), updatedPost.getId(), PostActivityType.CREATE);
+        // todo timeline service
+//        loggingPostActivity(author.getId(), updatedPost.getId(), PostActivityType.CREATE);
+        publishPostActivity(author.getId(), updatedPost.getId(), PostActivityType.UPDATE);
 
         return DailyfeedServerResponse.<PostDto.Post>builder()
                 .ok("Y")
@@ -94,6 +104,37 @@ public class PostService {
                 .reason("SUCCESS")
                 .data(postMapper.toPostDto(updatedPost, author))
                 .build();
+    }
+
+    public void publishPostActivity(Long memberId, Long postId, PostActivityType activityType) {
+        try{
+            LocalDateTime now = LocalDateTime.now();
+            String currentDate = now.format(DATE_FORMATTER);
+            String topicName = "post-activity-" + currentDate;
+
+            PostDto.PostActivityEvent activityEvent = PostDto.PostActivityEvent.builder()
+                    .memberId(memberId)
+                    .followingId(null) // 팔로우 관련 정보는 별도 처리 필요시 추가
+                    .postId(postId)
+                    .postActivityType(activityType)
+                    .createdAt(now)
+                    .updatedAt(now)
+                    .build();
+
+            kafkaTemplate.send(topicName, postId.toString(), activityEvent)
+                    .whenComplete((result, throwable) -> {
+                        if (throwable != null) {
+                            log.error("Failed to send post activity event to topic: {}, postId: {}, activityType: {}",
+                                    topicName, postId, activityType, throwable);
+                        } else {
+                            log.info("Successfully sent post activity event to topic: {}, postId: {}, activityType: {}",
+                                    topicName, postId, activityType);
+                        }
+                    });
+        }
+        catch (Exception e){
+            throw new KafkaNetworkErrorException();
+        }
     }
 
 //    @Transactional(propagation = Propagation.REQUIRES_NEW) // 추후 고려
@@ -118,6 +159,10 @@ public class PostService {
         }
 
         postRepository.softDeleteById(postId);
+
+        // todo timeline service
+        publishPostActivity(author.getId(), postId, PostActivityType.DELETE);
+
         return DailyfeedServerResponse.<Boolean>builder()
                 .ok("Y")
                 .statusCode("204")
