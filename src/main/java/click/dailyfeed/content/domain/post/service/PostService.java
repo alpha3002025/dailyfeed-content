@@ -7,18 +7,12 @@ import click.dailyfeed.code.domain.content.post.exception.PostUpdateForbiddenExc
 import click.dailyfeed.code.domain.content.post.type.PostActivityType;
 import click.dailyfeed.code.domain.member.member.dto.MemberDto;
 import click.dailyfeed.code.domain.member.member.exception.MemberNotFoundException;
-import click.dailyfeed.code.global.kafka.exception.KafkaException;
 import click.dailyfeed.code.global.kafka.exception.KafkaNetworkErrorException;
 import click.dailyfeed.code.global.web.response.DailyfeedPage;
 import click.dailyfeed.code.global.web.response.DailyfeedPageResponse;
 import click.dailyfeed.code.global.web.response.DailyfeedServerResponse;
-import click.dailyfeed.content.domain.comment.repository.jpa.CommentRepository;
 import click.dailyfeed.content.domain.post.entity.Post;
-import click.dailyfeed.content.domain.post.entity.PostActivityHistory;
-import click.dailyfeed.content.domain.post.entity.PostLatestActivity;
 import click.dailyfeed.content.domain.post.mapper.PostMapper;
-import click.dailyfeed.content.domain.post.repository.jpa.PostActivityHistoryRepository;
-import click.dailyfeed.content.domain.post.repository.jpa.PostLatestActivityRepository;
 import click.dailyfeed.content.domain.post.repository.jpa.PostRepository;
 import click.dailyfeed.feign.domain.member.MemberFeignHelper;
 import jakarta.servlet.http.HttpServletResponse;
@@ -44,8 +38,6 @@ import java.util.stream.Collectors;
 @Service
 public class PostService {
     private final PostRepository postRepository;
-    private final PostLatestActivityRepository postLatestActivityRepository;
-    private final PostActivityHistoryRepository postActivityHistoryRepository;
     private final PostMapper postMapper;
     private final MemberFeignHelper memberFeignHelper;
     private final KafkaTemplate<String, Object> kafkaTemplate;
@@ -64,8 +56,6 @@ public class PostService {
         Post post = Post.newPost(request.getTitle(), request.getContent(), authorId);
         Post savedPost = postRepository.save(post);
 
-        // todo timeline service
-//        loggingPostActivity(authorId, savedPost.getId(), PostActivityType.CREATE);
         publishPostActivity(authorId, savedPost.getId(), PostActivityType.CREATE);
 
         return DailyfeedServerResponse.<PostDto.Post>builder()
@@ -94,8 +84,6 @@ public class PostService {
         post.updatePost(request.getTitle(), request.getContent());
         Post updatedPost = postRepository.save(post);
 
-        // todo timeline service
-//        loggingPostActivity(author.getId(), updatedPost.getId(), PostActivityType.CREATE);
         publishPostActivity(author.getId(), updatedPost.getId(), PostActivityType.UPDATE);
 
         return DailyfeedServerResponse.<PostDto.Post>builder()
@@ -137,12 +125,6 @@ public class PostService {
         }
     }
 
-//    @Transactional(propagation = Propagation.REQUIRES_NEW) // 추후 고려
-    public void loggingPostActivity(Long memberId, Long postId, PostActivityType activityType) {
-        postActivityHistoryRepository.save(PostActivityHistory.newPostActivityHistory(memberId, postId, activityType));
-        postLatestActivityRepository.save(PostLatestActivity.newPostLatestActivity(memberId, postId, activityType));
-    }
-
     // 게시글 삭제 (소프트 삭제)
     public DailyfeedServerResponse<Boolean> deletePost(String token, Long postId, HttpServletResponse response) {
         MemberDto.Member author = memberFeignHelper.getMember(token, response);
@@ -160,8 +142,7 @@ public class PostService {
 
         postRepository.softDeleteById(postId);
 
-        // todo timeline service
-        publishPostActivity(author.getId(), postId, PostActivityType.DELETE);
+        publishPostActivity(author.getId(), postId, PostActivityType.SOFT_DELETE);
 
         return DailyfeedServerResponse.<Boolean>builder()
                 .ok("Y")
@@ -193,7 +174,6 @@ public class PostService {
                 .build();
     }
 
-    // 삭제할지 결정을 못함 TODO
     // 기본 기능 (REST API 기준으로만 짤때 만들었던 기능)
     @Transactional(readOnly = true)
     public DailyfeedPageResponse<PostDto.Post> getPosts(int page, int size, HttpServletResponse httpResponse) {

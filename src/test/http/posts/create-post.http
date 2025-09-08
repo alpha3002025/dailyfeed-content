@@ -1,0 +1,9 @@
+### POST /api/posts - Create Post
+POST http://localhost:8081/api/posts
+Authorization: Bearer eyJraWQiOiI0ODYzOTk2YS0zYjEyLTRlYjgtYjA3MS05NWY3OTRiYWViMDMiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0MUBleGFtcGxlLmNvbSIsImV4cCI6MTc1ODE4OTIxNSwiaWQiOjEwLCJlbWFpbCI6InRlc3QxQGV4YW1wbGUuY29tIiwicGFzc3dvcmQiOiIkMmEkMTAkdmduZWxrUnlqZ1M4bXMuSTRyQXpQZXpzNFpLTEZXUkVIU254dk05ZnFQY1VlYjBKclZJMGUifQ.NUe_HmetEvERlX9oKG3WIrEXuWctdT7IPEIrS20O730
+Content-Type: application/json
+
+{
+  "title": "Test Post Title",
+  "content": "This is a test post content."
+}
