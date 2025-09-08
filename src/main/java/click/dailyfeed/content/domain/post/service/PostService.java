@@ -121,6 +121,7 @@ public class PostService {
                     });
         }
         catch (Exception e){
+            log.error("Error publishing post activity event: ", e);
             throw new KafkaNetworkErrorException();
         }
     }

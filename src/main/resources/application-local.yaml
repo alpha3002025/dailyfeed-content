@@ -34,7 +34,7 @@ spring:
       host: ${REDIS_HOST:redis-master.infra.svc.cluster.local}
   ## kafka
   kafka:
-    bootstrap-servers: ${KAFKA_HOST:localhost}:${KAFKA_PORT:9092}
+    bootstrap-servers: ${KAFKA_HOST:localhost}:${KAFKA_PORT:29092}
     consumer:
       group-id: post-activity-consumer-group
       auto-offset-reset: earliest
@@ -53,13 +53,13 @@ spring:
       properties:
         spring.json.add.type.headers: false
         spring.json.trusted.packages: "click.dailyfeed.code.domain.content.post.dto"
-    properties:
-      security:
-        protocol: ${KAFKA_SASL_PROTOCOL}
-      sasl:
-        mechanism: ${KAFKA_SASL_MECHANISM}
-        jaas:
-          config: org.apache.kafka.common.security.scram.ScramLoginModule required username="${KAFKA_USER}" password="${KAFKA_PASSWORD}";
+    #properties:
+      #security:
+        #protocol: ${KAFKA_SASL_PROTOCOL}
+      #sasl:
+        #mechanism: ${KAFKA_SASL_MECHANISM}
+        #jaas:
+          #config: org.apache.kafka.common.security.scram.ScramLoginModule required username="${KAFKA_USER}" password="${KAFKA_PASSWORD}";
 springdoc:
   packages-to-scan: click.dailyfeed.timeline.domain
   default-consumes-media-type: application/json;charset=UTF-8
