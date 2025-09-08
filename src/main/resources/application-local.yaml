@@ -1,14 +1,19 @@
+
 spring:
   application:
     name: dailyfeed-content
   ## database connection
   datasource:
+    driver-class-name: com.mysql.jdbc.Driver
+    url: ${MYSQL_JDBC_URL}
+    username: ${MYSQL_USERNAME:dailyfeed}
+    password: ${MYSQL_PASSWORD:hitEnter###}
     hikari:
-      jdbc-url: jdbc:mysql://127.0.0.1:23306/dailyfeed?characterEncoding=UTF-8&serverTimezone=UTC&rewriteBatchedStatements=true
+      jdbc-url: ${MYSQL_JDBC_URL}
       driver-class-name: com.mysql.jdbc.Driver
-      username: root
-      password: hitEnter!!!
-      schema: dailyfeed
+      username: ${MYSQL_USERNAME:dailyfeed}
+      password: ${MYSQL_PASSWORD:hitEnter###}
+      schema: ${MYSQL_SCHEMA:dailyfeed}
   ## jpa
   jpa:
     hibernate:
@@ -20,13 +25,17 @@ spring:
     restart:
       enabled: false
   data:
-    ## paging ??
     web:
+      ## paging 관련
       pageable:
         max-page-size: 100
         default-page-size: 20
+    redis:
+      port: ${REDIS_PORT:6379}
+      host: ${REDIS_HOST:redis-master.infra.svc.cluster.local}
+  ## kafka
   kafka:
-    bootstrap-servers: ${KAFKA_SERVER:localhost:9092}
+    bootstrap-servers: ${KAFKA_HOST:localhost}:${KAFKA_PORT:9092}
     consumer:
       group-id: post-activity-consumer-group
       auto-offset-reset: earliest
@@ -45,7 +54,13 @@ spring:
       properties:
         spring.json.add.type.headers: false
         spring.json.trusted.packages: "click.dailyfeed.code.domain.content.post.dto"
-
+    properties:
+      security:
+        protocol: ${KAFKA_SASL_PROTOCOL}
+      sasl:
+        mechanism: ${KAFKA_SASL_MECHANISM}
+        jaas:
+          config: org.apache.kafka.common.security.scram.ScramLoginModule required username="${KAFKA_USER}" password="${KAFKA_PASSWORD}";
 springdoc:
   packages-to-scan: click.dailyfeed.timeline.domain
   default-consumes-media-type: application/json;charset=UTF-8
@@ -73,7 +88,7 @@ dailyfeed:
   services:
     member:
       feign:
-        url: ${MEMBER_SERVICE_URL:http://localhost:8081}
+        url: ${MEMBER_SERVICE_URL:http://localhost:8084}
         timeout:
           connect: 5000
           read: 10000
@@ -84,6 +99,11 @@ dailyfeed:
           connect: 5000
           read: 10000
     content:
+      feign:
+        url: ${CONTENT_SERVICE_URL:http://localhost:8081}
+        timeout:
+          connect: 5000
+          read: 10000
       comment:
         max-depth: 2    # 댓글 최대 깊이
         page-size: 20   # 기본 페이지 크기
@@ -116,3 +136,5 @@ infrastructure:
       notification:
         group-id: notification-consumer-group
         concurrency: 1
+server:
+  port: ${SERVER_PORT:8081}
