@@ -34,7 +34,7 @@ spring:
       host: ${REDIS_HOST:redis-master.infra.svc.cluster.local}
     mongodb:
       protocol: mongodb+srv # mongodb+srv or mongodb (atlas 에서만 mongodb+srv)
-      uri: ${MONGODB_CONNECTION_URI:mongodb+srv://dailyfeed-search:hitEnter###@alpha300.sz30zco.mongodb.net/dailyfeed?retryWrites=true&w=majority&appName=alpha300}
+      uri: ${MONGODB_CONNECTION_URI:mongodb+srv://dailyfeed-search:hitEnter###@alpha300.sz30zco.mongodb.net/dailyfeed?retryWrites=true&w=majority&appName=alpha300&connectTimeoutMS=30000&socketTimeoutMS=30000&serverSelectionTimeoutMS=30000}
   jackson:
     serialization:
       write-dates-as-timestamps: false
@@ -59,12 +59,6 @@ spring:
       properties:
         spring.json.add.type.headers: false
         spring.json.trusted.packages: "click.dailyfeed.code.domain.content.post.dto"
-    security:
-      protocol: ${KAFKA_SASL_PROTOCOL}
-    sasl:
-      mechanism: ${KAFKA_SASL_MECHANISM}
-      jaas:
-        config: org.apache.kafka.common.security.scram.ScramLoginModule required username="${KAFKA_USER}" password="${KAFKA_PASSWORD}";
     # SASL 인증 비활성화 (로컬 docker-compose는 PLAINTEXT 사용)
 springdoc:
   packages-to-scan: click.dailyfeed.timeline.domain

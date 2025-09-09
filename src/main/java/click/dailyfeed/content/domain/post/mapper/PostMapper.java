@@ -55,17 +55,17 @@ public interface PostMapper {
     @Mapping(target = "updatedAt", source = "post.updatedAt")
     PostDto.Post toPostDto(Post post);
 
-//    @Mapping(target = "id", source = "post.id")
-//    @Mapping(target = "title", source = "post.title")
-//    @Mapping(target = "content", source = "post.content")
-//    @Mapping(target = "authorId", source = "post.authorId")
-//    @Mapping(target = "viewCount", source = "post.viewCount")
-//    @Mapping(target = "likeCount", source = "post.likeCount")
-//    @Mapping(target = "createdAt", source = "post.createdAt")
-//    @Mapping(target = "updatedAt", source = "post.updatedAt")
-//    @Mapping(target = "authorName", ignore = true) // Service에서 설정
-//    @Mapping(target = "authorEmail", ignore = true) // Service에서 설정
-//    @Mapping(target = "commentCount", ignore = true) // Service에서 설정
+    @Mapping(target = "id", source = "post.id")
+    @Mapping(target = "title", source = "post.title")
+    @Mapping(target = "content", source = "post.content")
+    @Mapping(target = "authorId", source = "post.authorId")
+    @Mapping(target = "viewCount", source = "post.viewCount")
+    @Mapping(target = "likeCount", source = "post.likeCount")
+    @Mapping(target = "createdAt", source = "post.createdAt")
+    @Mapping(target = "updatedAt", source = "post.updatedAt")
+    @Mapping(target = "authorName", ignore = true) // Service에서 설정
+    @Mapping(target = "authorEmail", ignore = true) // Service에서 설정
+    @Mapping(target = "commentCount", ignore = true) // Service에서 설정
     PostDto.Post toPostDtoIgnoreAuthor(Post post);
 
 

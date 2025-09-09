@@ -11,9 +11,11 @@ import click.dailyfeed.code.global.kafka.exception.KafkaNetworkErrorException;
 import click.dailyfeed.code.global.web.response.DailyfeedPage;
 import click.dailyfeed.code.global.web.response.DailyfeedPageResponse;
 import click.dailyfeed.code.global.web.response.DailyfeedServerResponse;
+import click.dailyfeed.content.domain.post.document.PostDocument;
 import click.dailyfeed.content.domain.post.entity.Post;
 import click.dailyfeed.content.domain.post.mapper.PostMapper;
 import click.dailyfeed.content.domain.post.repository.jpa.PostRepository;
+import click.dailyfeed.content.domain.post.repository.mongo.PostMongoRepository;
 import click.dailyfeed.feign.domain.member.MemberFeignHelper;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -41,6 +43,7 @@ public class PostService {
     private final PostMapper postMapper;
     private final MemberFeignHelper memberFeignHelper;
     private final KafkaTemplate<String, Object> kafkaTemplate;
+    private final PostMongoRepository postMongoRepository;
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
 
@@ -53,17 +56,30 @@ public class PostService {
         }
 
         Long authorId = author.getId();
+
+        // 본문 저장
         Post post = Post.newPost(request.getTitle(), request.getContent(), authorId);
         Post savedPost = postRepository.save(post);
 
+        // mongodb 에 본문 내용 저장
+        insertNewDocument(savedPost);
+
+        // timeline 조회를 위한 활동 기록 이벤트 발행
         publishPostActivity(authorId, savedPost.getId(), PostActivityType.CREATE);
 
+        // return
         return DailyfeedServerResponse.<PostDto.Post>builder()
                 .data(postMapper.toPostDto(savedPost, author, 0))
                 .ok("Y")
                 .statusCode("201")
                 .reason("SUCCESS")
                 .build();
+    }
+
+    public void insertNewDocument(Post post){
+        PostDocument document = PostDocument
+                .newPost(post.getId(), post.getTitle(), post.getContent(), post.getCreatedAt(), post.getUpdatedAt());
+        postMongoRepository.save(document);
     }
 
     // 게시글 수정
@@ -81,17 +97,33 @@ public class PostService {
             throw new PostUpdateForbiddenException();
         }
 
+        // 수정 요청 반영
         post.updatePost(request.getTitle(), request.getContent());
-        Post updatedPost = postRepository.save(post);
 
-        publishPostActivity(author.getId(), updatedPost.getId(), PostActivityType.UPDATE);
+        // mongodb에 본문 내용 저장
+        updateDocument(post);
 
+        // timeline 조회를 위한 활동 기록 이벤트 발행
+        publishPostActivity(author.getId(), post.getId(), PostActivityType.UPDATE);
+
+        // return
         return DailyfeedServerResponse.<PostDto.Post>builder()
                 .ok("Y")
                 .statusCode("200")
                 .reason("SUCCESS")
-                .data(postMapper.toPostDto(updatedPost, author))
+                .data(postMapper.toPostDto(post, author))
                 .build();
+    }
+
+    public void updateDocument(Post post){
+        PostDocument oldDocument = postMongoRepository
+                .findByPostPkAndIsDeletedAndIsCurrent(post.getId(), Boolean.FALSE, Boolean.TRUE)
+                .orElseThrow(PostNotFoundException::new);
+
+//        oldDocument.markAsDeleted(Boolean.FALSE);
+        PostDocument updatedPost = PostDocument.newUpdatedPost(oldDocument, post.getUpdatedAt());
+
+        postMongoRepository.save(updatedPost);
     }
 
     public void publishPostActivity(Long memberId, Long postId, PostActivityType activityType) {
@@ -141,9 +173,14 @@ public class PostService {
             throw new PostDeleteForbiddenException();
         }
 
+        // 관계형 데이터베이스에 데이터
         postRepository.softDeleteById(postId);
 
+        // timeline 을 위한 활동 기록
         publishPostActivity(author.getId(), postId, PostActivityType.SOFT_DELETE);
+
+        // mongodb
+        deletePostDocument(post);
 
         return DailyfeedServerResponse.<Boolean>builder()
                 .ok("Y")
@@ -151,6 +188,14 @@ public class PostService {
                 .reason("SUCCESS")
                 .data(Boolean.TRUE)
                 .build();
+    }
+
+    public void deletePostDocument(Post post){
+        PostDocument oldDocument = postMongoRepository
+                .findByPostPkAndIsDeletedAndIsCurrent(post.getId(), Boolean.FALSE, Boolean.TRUE)
+                .orElseThrow(PostNotFoundException::new);
+
+        oldDocument.softDelete();
     }
 
     // 게시글 상세 조회 (조회수 증가)
