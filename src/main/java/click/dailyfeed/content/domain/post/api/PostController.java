@@ -16,6 +16,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -23,6 +24,17 @@ import java.time.LocalDateTime;
 @RestController
 public class PostController {
     private final PostService postService;
+
+    /// 특정 post Id 리스트에 해당되는 글 목록
+    @Operation(summary = "특정 post id 리스트에 해당하는 글 목록", description = "글 id 목록에 대한 글 데이터 목록을 조회합니다.")
+    @PostMapping  ("/list")
+    public DailyfeedServerResponse<List<PostDto.Post>> getPostListByIdsIn(
+            @RequestHeader(value = "Authorization", required = false) String token,
+            HttpServletResponse httpResponse,
+            PostDto.PostsBulkRequest request
+    ){
+        return postService.getPostListByIdsIn(request, token, httpResponse);
+    }
 
     // 게시글 작성
     @Operation(summary = "게시글 작성", description = "새로운 게시글을 작성합니다.")

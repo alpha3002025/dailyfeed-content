@@ -17,6 +17,7 @@ import click.dailyfeed.content.domain.post.mapper.PostMapper;
 import click.dailyfeed.content.domain.post.repository.jpa.PostRepository;
 import click.dailyfeed.content.domain.post.repository.mongo.PostMongoRepository;
 import click.dailyfeed.feign.domain.member.MemberFeignHelper;
+import click.dailyfeed.feign.domain.post.PostFeignHelper;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,8 +45,18 @@ public class PostService {
     private final MemberFeignHelper memberFeignHelper;
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final PostMongoRepository postMongoRepository;
+    private final PostFeignHelper postFeignHelper;
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
+
+    // TODO (작명 수정 필요) :: BULK REQUEST 네이밍 변경 필요  🫡
+    // 특정 post id 리스트에 해당하는 post 리스트 조회
+    public DailyfeedServerResponse<List<PostDto.Post>> getPostListByIdsIn(PostDto.PostsBulkRequest request, String token, HttpServletResponse httpResponse) {
+        List<PostDto.Post> postList = postFeignHelper.getPostList(request, token, httpResponse);
+        return DailyfeedServerResponse.<List<PostDto.Post>>builder()
+                .ok("Y").statusCode("200").reason("SUCCESS").data(postList)
+                .build();
+    }
 
     // 게시글 작성
     public DailyfeedServerResponse<PostDto.Post> createPost(String token, PostDto.CreatePostRequest request, HttpServletResponse response) {
