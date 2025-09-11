@@ -59,13 +59,8 @@ public class PostService {
     }
 
     // 게시글 작성
-    public DailyfeedServerResponse<PostDto.Post> createPost(String token, PostDto.CreatePostRequest request, HttpServletResponse response) {
+    public DailyfeedServerResponse<PostDto.Post> createPost(MemberDto.Member author, PostDto.CreatePostRequest request, HttpServletResponse response) {
         // 작성자 정보 확인
-        MemberDto.Member author = memberFeignHelper.getMember(token, response);
-        if (author == null) {
-            throw new MemberNotFoundException(() -> "삭제된 사용자의 접근입니다.");
-        }
-
         Long authorId = author.getId();
 
         // 본문 저장
@@ -94,12 +89,7 @@ public class PostService {
     }
 
     // 게시글 수정
-    public DailyfeedServerResponse<PostDto.Post> updatePost(String token, Long postId, PostDto.UpdatePostRequest request, HttpServletResponse response) {
-        MemberDto.Member author = memberFeignHelper.getMember(token, response);
-        if (author == null) {
-            throw new MemberNotFoundException(() -> "삭제된 사용자의 접근입니다.");
-        }
-
+    public DailyfeedServerResponse<PostDto.Post> updatePost(MemberDto.Member author, Long postId, PostDto.UpdatePostRequest request, HttpServletResponse response) {
         Post post = postRepository.findByIdAndNotDeleted(postId)
                 .orElseThrow(PostNotFoundException::new);
 
@@ -170,12 +160,7 @@ public class PostService {
     }
 
     // 게시글 삭제 (소프트 삭제)
-    public DailyfeedServerResponse<Boolean> deletePost(String token, Long postId, HttpServletResponse response) {
-        MemberDto.Member author = memberFeignHelper.getMember(token, response);
-        if (author == null) {
-            throw new MemberNotFoundException(() -> "삭제된 사용자의 접근입니다.");
-        }
-
+    public DailyfeedServerResponse<Boolean> deletePost(MemberDto.Member author, Long postId, HttpServletResponse response) {
         Post post = postRepository.findByIdAndNotDeleted(postId)
                 .orElseThrow(PostNotFoundException::new);
 

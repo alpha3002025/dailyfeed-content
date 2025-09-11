@@ -1,9 +1,11 @@
 package click.dailyfeed.content.domain.post.api;
 
 import click.dailyfeed.code.domain.content.post.dto.PostDto;
+import click.dailyfeed.code.domain.member.member.dto.MemberDto;
 import click.dailyfeed.code.global.web.response.DailyfeedPageResponse;
 import click.dailyfeed.code.global.web.response.DailyfeedServerResponse;
 import click.dailyfeed.content.domain.post.service.PostService;
+import click.dailyfeed.feign.config.web.AuthenticatedMember;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -29,6 +31,7 @@ public class PostController {
     @Operation(summary = "특정 post id 리스트에 해당하는 글 목록", description = "글 id 목록에 대한 글 데이터 목록을 조회합니다.")
     @PostMapping  ("/list")
     public DailyfeedServerResponse<List<PostDto.Post>> getPostListByIdsIn(
+            @AuthenticatedMember MemberDto.Member member,
             @RequestHeader(value = "Authorization", required = false) String token,
             HttpServletResponse httpResponse,
             PostDto.PostsBulkRequest request
@@ -40,38 +43,39 @@ public class PostController {
     @Operation(summary = "게시글 작성", description = "새로운 게시글을 작성합니다.")
     @PostMapping
     public DailyfeedServerResponse<PostDto.Post> createPost(
-            @RequestHeader("Authorization") String authorizationHeader,
+            @AuthenticatedMember MemberDto.Member member,
             @Valid @RequestBody PostDto.CreatePostRequest request,
             HttpServletResponse response ) {
 
-        return postService.createPost(authorizationHeader, request, response);
+        return postService.createPost(member, request, response);
     }
 
     // 게시글 수정
     @Operation(summary = "게시글 수정", description = "기존 게시글을 수정합니다.")
     @PutMapping("/{postId}")
     public DailyfeedServerResponse<PostDto.Post> updatePost(
-            @RequestHeader("Authorization") String authorizationHeader,
+            @AuthenticatedMember MemberDto.Member member,
             HttpServletResponse httpResponse,
             @PathVariable Long postId,
             @Valid @RequestBody PostDto.UpdatePostRequest updateRequest ) {
-        return postService.updatePost(authorizationHeader, postId, updateRequest, httpResponse);
+        return postService.updatePost(member, postId, updateRequest, httpResponse);
     }
 
     // 게시글 삭제
     @Operation(summary = "게시글 삭제", description = "기존 게시글을 삭제합니다.")
     @DeleteMapping("/{postId}")
     public DailyfeedServerResponse<Boolean> deletePost(
-            @RequestHeader("Authorization") String authorizationHeader,
+            @AuthenticatedMember MemberDto.Member member,
             HttpServletResponse httpResponse,
             @PathVariable Long postId ) {
-        return postService.deletePost(authorizationHeader, postId, httpResponse);
+        return postService.deletePost(member, postId, httpResponse);
     }
 
     // 게시글 상세 조회
     @Operation(summary = "게시글 상세 조회", description = "특정 게시글의 상세 정보를 조회합니다.")
     @GetMapping("/{postId}")
     public DailyfeedServerResponse<PostDto.Post> getPost(
+            @AuthenticatedMember MemberDto.Member member,
             @RequestHeader(value = "Authorization", required = false) String token,
             HttpServletResponse httpResponse,
             @PathVariable Long postId) {
@@ -80,13 +84,18 @@ public class PostController {
 
     // 게시글 좋아요 증가
     @PostMapping("/{postId}/like")
-    public DailyfeedServerResponse<Boolean> incrementLikeCount(@PathVariable Long postId) {
+    public DailyfeedServerResponse<Boolean> incrementLikeCount(
+            @AuthenticatedMember MemberDto.Member member,
+            @PathVariable Long postId
+    ) {
         return postService.incrementLikeCount(postId);
     }
 
     // 게시글 좋아요 감소
     @DeleteMapping("/{postId}/like")
-    public DailyfeedServerResponse<Boolean> decrementLikeCount(@PathVariable Long postId) {
+    public DailyfeedServerResponse<Boolean> decrementLikeCount(
+            @AuthenticatedMember MemberDto.Member member,
+            @PathVariable Long postId) {
         return postService.decrementLikeCount(postId);
     }
 
@@ -94,15 +103,16 @@ public class PostController {
     @Operation(summary = "특정 사용자의 게시글 목록 조회", description = "특정 사용자가 작성한 게시글을 페이징하여 조회합니다.")
     @GetMapping("/authors/{authorId}")
     public DailyfeedPageResponse<PostDto.Post> getPostsByAuthor(
+            @AuthenticatedMember MemberDto.Member member,
             HttpServletResponse httpResponse,
-            @RequestHeader("Authorization") String authorizationHeader,
+            @RequestHeader("Authorization") String token,
             @PageableDefault(
                     page = 0,
                     size = 10,
                     sort = "createdAt",
                     direction = Sort.Direction.DESC
             ) Pageable pageable) {
-        return postService.getPostsByAuthor(authorizationHeader, pageable, httpResponse);
+        return postService.getPostsByAuthor(token, pageable, httpResponse);
     }
 
     // TODO (삭제) timeline+contents 서비스로 이관
