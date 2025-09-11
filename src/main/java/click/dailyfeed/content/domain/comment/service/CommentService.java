@@ -46,8 +46,7 @@ public class CommentService {
         Long authorId = author.getId();
 
         // 게시글 존재 확인
-        Post post = postRepository.findByIdAndNotDeleted(request.getPostId())
-                .orElseThrow(PostNotFoundException::new);
+        Post post = getPostByIdOrThrow(request.getPostId());
 
         Comment comment;
 
@@ -85,7 +84,7 @@ public class CommentService {
 
         // 응답 생성 및 작성자 정보 추가
         CommentDto.Comment commentDto = commentMapper.toComment(savedComment, author);
-        updateCommentAuthor(List.of(commentDto), httpResponse);
+        mergeAuthorData(List.of(commentDto), httpResponse);
 
         return DailyfeedServerResponse.<CommentDto.Comment>builder()
                 .ok("Y")
@@ -113,7 +112,7 @@ public class CommentService {
 
         // 응답 생성 및 작성자 정보 추가
         CommentDto.Comment commentUpdated = commentMapper.toComment(updatedComment, author);
-        updateCommentAuthor(List.of(commentUpdated), httpResponse);
+        mergeAuthorData(List.of(commentUpdated), httpResponse);
 
         return DailyfeedServerResponse.<CommentDto.Comment>builder()
                 .ok("Y")
@@ -144,13 +143,12 @@ public class CommentService {
     // 특정 게시글의 댓글 목록 조회 (계층구조)
     @Transactional(readOnly = true)
     public DailyfeedPageResponse<CommentDto.Comment> getCommentsByPost(Long postId, Pageable pageable, HttpServletResponse httpResponse) {
-        Post post = postRepository.findByIdAndNotDeleted(postId)
-                .orElseThrow(PostNotFoundException::new);
+        Post post = getPostByIdOrThrow(postId);
 
-        Page<Comment> topLevelComments = commentRepository.findCommentHierarchyByPost(post, pageable);
+        Page<Comment> topLevelComments = commentRepository.findCommentsByPost(post, pageable);
 
         // 모든 댓글(자식 포함)의 작성자 정보 추가
-        DailyfeedPage<CommentDto.Comment> updatedCommentPage = updateCommentsAuthorsRecursively(topLevelComments, httpResponse);
+        DailyfeedPage<CommentDto.Comment> updatedCommentPage = mergeAuthorDataRecursively(topLevelComments, httpResponse);
 
         return DailyfeedPageResponse.<CommentDto.Comment>builder()
                 .ok("Y").statusCode("200").reason("SUCCESS")
@@ -161,15 +159,12 @@ public class CommentService {
     // 특정 게시글의 댓글 목록을 페이징으로 조회
     @Transactional(readOnly = true)
     public DailyfeedPageResponse<CommentDto.Comment> getCommentsByPostWithPaging(Long postId, int page, int size, HttpServletResponse httpResponse) {
-        log.info("Getting comments for post {} with paging - page: {}, size: {}", postId, page, size);
-
-        Post post = postRepository.findByIdAndNotDeleted(postId)
-                .orElseThrow(PostNotFoundException::new);
+        Post post = getPostByIdOrThrow(postId);
 
         Pageable pageable = PageRequest.of(page, size);
         Page<Comment> comments = commentRepository.findTopLevelCommentsByPostWithPaging(post, pageable);
 
-        DailyfeedPage<CommentDto.Comment> updatedCommentPage = updateCommentsAuthorsRecursively(comments, httpResponse);
+        DailyfeedPage<CommentDto.Comment> updatedCommentPage = mergeAuthorDataRecursively(comments, httpResponse);
 
         return DailyfeedPageResponse.<CommentDto.Comment>builder()
                 .ok("Y").statusCode("200").reason("SUCCESS")
@@ -182,8 +177,6 @@ public class CommentService {
     // 대댓글 목록 조회
     @Transactional(readOnly = true)
     public DailyfeedPageResponse<CommentDto.Comment> getRepliesByParent(Long parentId, int page, int size, HttpServletResponse httpResponse) {
-        log.info("Getting replies for parent comment: {}", parentId);
-
         Comment parentComment = commentRepository.findByIdAndNotDeleted(parentId)
                 .orElseThrow(ParentCommentNotFoundException::new);
 
@@ -194,7 +187,7 @@ public class CommentService {
                 .map(commentMapper::toComment)
                 .collect(Collectors.toList());
 
-        updateCommentAuthor(commentList, httpResponse);
+        mergeAuthorData(commentList, httpResponse);
 
         return DailyfeedPageResponse.<CommentDto.Comment>builder()
                 .ok("Y").statusCode("200").reason("SUCCESS")
@@ -205,13 +198,11 @@ public class CommentService {
     // 댓글 상세 조회
     @Transactional(readOnly = true)
     public DailyfeedServerResponse<CommentDto.Comment> getComment(Long commentId, HttpServletResponse httpResponse) {
-        log.info("Getting comment: {}", commentId);
-
         Comment comment = commentRepository.findByIdAndNotDeleted(commentId)
                 .orElseThrow(CommentNotFoundException::new);
 
         CommentDto.Comment commentDto = commentMapper.toComment(comment);
-        updateCommentAuthor(List.of(commentDto), httpResponse);
+        mergeAuthorData(List.of(commentDto), httpResponse);
 
         return DailyfeedServerResponse.<CommentDto.Comment>builder().ok("Y").statusCode("200").reason("OK").data(commentDto).build();
     }
@@ -262,9 +253,10 @@ public class CommentService {
     }
 
     // 계층구조 댓글에 작성자 정보 추가 (재귀적)
-    private DailyfeedPage<CommentDto.Comment> updateCommentsAuthorsRecursively(Page<Comment> commentsPage, HttpServletResponse httpResponse) {
+    private DailyfeedPage<CommentDto.Comment> mergeAuthorDataRecursively(Page<Comment> commentsPage, HttpServletResponse httpResponse) {
+        if(commentsPage.isEmpty()) return commentMapper.emptyPage();
+
         List<CommentDto.Comment> commentList = commentsPage.getContent().stream().map(commentMapper::toComment).collect(Collectors.toList());
-        if (commentList.isEmpty()) return commentMapper.emptyPage();
 
         Set<Long> authorIds = commentList.stream()
                 .map(CommentDto.Comment::getAuthorId)
@@ -283,7 +275,7 @@ public class CommentService {
 
     }
 
-    private void updateCommentAuthor(List<CommentDto.Comment> comments, HttpServletResponse httpResponse) {
+    private void mergeAuthorData(List<CommentDto.Comment> comments, HttpServletResponse httpResponse) {
         if (comments.isEmpty()) return;
 
         Set<Long> authorIds = comments.stream()
@@ -325,6 +317,13 @@ public class CommentService {
                 .orElseThrow(CommentNotFoundException::new);
 
         commentRepository.decrementLikeCount(commentId);
+    }
+
+
+    ///  helpers ///
+    /// 글 조회
+    public Post getPostByIdOrThrow(Long postId) {
+        return postRepository.findByIdAndNotDeleted(postId).orElseThrow(PostNotFoundException::new);
     }
 
 }

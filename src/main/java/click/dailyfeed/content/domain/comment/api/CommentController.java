@@ -20,8 +20,9 @@ import org.springframework.web.bind.annotation.*;
 public class CommentController {
     private final CommentService commentService;
 
+    ///  /comments  ///
     // 댓글 작성
-    @PostMapping
+    @PostMapping("/")
     public DailyfeedServerResponse<CommentDto.Comment> createComment(
             @RequestHeader("Authorization") String authorizationHeader,
             HttpServletResponse httpResponse,
@@ -29,6 +30,58 @@ public class CommentController {
         return commentService.createComment(authorizationHeader, request, httpResponse);
     }
 
+    // 내 댓글 목록
+    @GetMapping("/")
+    public DailyfeedPageResponse<CommentDto.CommentSummary> getMyComments(
+            HttpServletResponse httpResponse,
+            @RequestHeader("Authorization") String authorizationHeader,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return commentService.getMyComments(authorizationHeader, page, size, httpResponse);
+    }
+
+    ///  /comments/post/{postId}    ///
+    // 특정 게시글의 댓글 목록 조회 (계층구조)
+    @GetMapping("/post/{postId}/list")
+    public DailyfeedPageResponse<CommentDto.Comment> getCommentsByPostWithoutPaging(
+            String token,
+            HttpServletResponse httpResponse,
+            @PageableDefault(
+                    page = 0,
+                    size = 10,
+                    sort = "createdAt",
+                    direction = Sort.Direction.DESC
+            ) Pageable pageable,
+            @PathVariable Long postId
+    ) {
+        return commentService.getCommentsByPost(postId, pageable, httpResponse);
+    }
+
+    // 참고)
+    // Post Controller 내에서 구성하는게 이론적으로는 적절하지만,
+    // 게시글 서비스와 댓글 서비스간의 경계를 구분하기로 결정했기에 댓글 관리의 주체를 CommentController 로 지정
+    // 특정 게시글의 댓글 목록을 페이징으로 조회
+    @GetMapping("/post/{postId}")
+    public DailyfeedPageResponse<CommentDto.Comment> getCommentsByPost(
+            HttpServletResponse httpResponse,
+            @PathVariable Long postId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return commentService.getCommentsByPostWithPaging(postId, page, size, httpResponse);
+    }
+
+    /// /comments/member/{memberId}     ///
+    // 특정 사용자의 댓글 목록
+    @GetMapping("/member/{memberId}")
+    public DailyfeedPageResponse<CommentDto.CommentSummary> getCommentsByUser(
+            HttpServletResponse httpResponse,
+            @PathVariable Long memberId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return commentService.getCommentsByUser(memberId, page, size, httpResponse);
+    }
+
+    /// /comments/{commentId}   ///
     // 댓글 수정
     @PutMapping("/{commentId}")
     public DailyfeedServerResponse<CommentDto.Comment> updateComment(
@@ -55,53 +108,6 @@ public class CommentController {
             HttpServletResponse httpResponse,
             @PathVariable Long commentId) {
         return commentService.getComment(commentId, httpResponse);
-    }
-
-    // 특정 게시글의 댓글 목록 조회 (계층구조)
-    @GetMapping("/post/{postId}/list")
-    public DailyfeedPageResponse<CommentDto.Comment> getCommentsByPostWithoutPaging(
-            HttpServletResponse httpResponse,
-            @PathVariable Long postId,
-            @PageableDefault(
-                    page = 0,
-                    size = 10,
-                    sort = "createdAt",
-                    direction = Sort.Direction.DESC
-            ) Pageable pageable) {
-        return commentService.getCommentsByPost(postId, pageable, httpResponse);
-    }
-
-    // 참고)
-    // Post Controller 내에서 구성하는게 이론적으로는 적절하지만,
-    // 게시글 서비스와 댓글 서비스간의 경계를 구분하기로 결정했기에 댓글 관리의 주체를 CommentController 로 지정
-    // 특정 게시글의 댓글 목록을 페이징으로 조회
-    @GetMapping("/post/{postId}")
-    public DailyfeedPageResponse<CommentDto.Comment> getCommentsByPost(
-            HttpServletResponse httpResponse,
-            @PathVariable Long postId,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
-        return commentService.getCommentsByPostWithPaging(postId, page, size, httpResponse);
-    }
-
-    // 특정 사용자의 댓글 목록
-    @GetMapping("/user/{userId}")
-    public DailyfeedPageResponse<CommentDto.CommentSummary> getCommentsByUser(
-            HttpServletResponse httpResponse,
-            @PathVariable Long userId,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
-        return commentService.getCommentsByUser(userId, page, size, httpResponse);
-    }
-
-    // 내 댓글 목록
-    @GetMapping("/my")
-    public DailyfeedPageResponse<CommentDto.CommentSummary> getMyComments(
-            HttpServletResponse httpResponse,
-            @RequestHeader("Authorization") String authorizationHeader,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
-        return commentService.getMyComments(authorizationHeader, page, size, httpResponse);
     }
 
     // 대댓글 목록 조회

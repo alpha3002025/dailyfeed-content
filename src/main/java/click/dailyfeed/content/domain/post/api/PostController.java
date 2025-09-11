@@ -60,9 +60,10 @@ public class PostController {
     @Operation(summary = "게시글 상세 조회", description = "특정 게시글의 상세 정보를 조회합니다.")
     @GetMapping("/{postId}")
     public DailyfeedServerResponse<PostDto.Post> getPost(
+            @RequestHeader(value = "Authorization", required = false) String token,
             HttpServletResponse httpResponse,
             @PathVariable Long postId) {
-        return postService.getPost(postId, httpResponse);
+        return postService.getPost(postId, token, httpResponse);
     }
 
     // 게시글 좋아요 증가

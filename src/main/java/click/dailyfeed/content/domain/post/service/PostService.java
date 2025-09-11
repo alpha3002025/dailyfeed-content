@@ -200,9 +200,7 @@ public class PostService {
 
     // 게시글 상세 조회 (조회수 증가)
     @Transactional(readOnly = true)
-    public DailyfeedServerResponse<PostDto.Post> getPost(Long postId, HttpServletResponse response) {
-        log.info("Getting post: {}", postId);
-
+    public DailyfeedServerResponse<PostDto.Post> getPost(Long postId, String token, HttpServletResponse response) {
         Post post = postRepository.findByIdAndNotDeleted(postId)
                 .orElseThrow(PostNotFoundException::new);
 
@@ -210,7 +208,7 @@ public class PostService {
         post.incrementLikeCount();
 
         // 작성자 정보 조회
-        MemberDto.Member author = memberFeignHelper.getMemberById(post.getAuthorId(), response);
+        MemberDto.Member author = memberFeignHelper.getMemberById(post.getAuthorId(), token, response);
 
         return DailyfeedServerResponse.<PostDto.Post>builder()
                 .ok("Y")

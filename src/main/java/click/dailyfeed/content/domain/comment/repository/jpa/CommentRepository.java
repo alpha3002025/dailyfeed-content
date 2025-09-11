@@ -39,7 +39,7 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
 
     // 특정 게시글의 댓글을 계층구조로 조회
     @Query("SELECT c FROM Comment c LEFT JOIN FETCH c.children WHERE c.post = :post AND c.parent IS NULL AND c.isDeleted = false ORDER BY c.createdAt ASC")
-    Page<Comment> findCommentHierarchyByPost(@Param("post") Post post, Pageable pageable);
+    Page<Comment> findCommentsByPost(@Param("post") Post post, Pageable pageable);
 
     // ID로 댓글 조회 (삭제되지 않은)
     @Query("SELECT c FROM Comment c WHERE c.id = :id AND c.isDeleted = false")
