@@ -1,7 +1,6 @@
 package click.dailyfeed.content.domain.post.mapper;
 
 import click.dailyfeed.code.domain.content.post.dto.PostDto;
-import click.dailyfeed.code.domain.member.member.dto.MemberDto;
 import click.dailyfeed.code.domain.member.member.dto.MemberProfileDto;
 import click.dailyfeed.content.domain.post.entity.Post;
 import org.mapstruct.Mapper;
