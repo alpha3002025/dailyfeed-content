@@ -44,7 +44,10 @@ public class CommentController {
     }
 
     ///  /comments/post/{postId}    ///
-    // 특정 게시글의 댓글 목록 조회 (계층구조)
+    /// 참고)
+    ///   Post Controller 내에서 구성하는게 이론적으로는 적절하지만,
+    ///   게시글 서비스와 댓글 서비스간의 경계를 구분하기로 결정했기에 댓글 관리의 주체를 CommentController 로 지정
+    ///   특정 게시글의 댓글 목록 조회 (계층구조)
     @GetMapping("/post/{postId}/list")
     public DailyfeedPageResponse<CommentDto.Comment> getCommentsByPostWithoutPaging(
             String token,
@@ -60,9 +63,6 @@ public class CommentController {
         return commentService.getCommentsByPost(postId, pageable, httpResponse);
     }
 
-    // 참고)
-    // Post Controller 내에서 구성하는게 이론적으로는 적절하지만,
-    // 게시글 서비스와 댓글 서비스간의 경계를 구분하기로 결정했기에 댓글 관리의 주체를 CommentController 로 지정
     // 특정 게시글의 댓글 목록을 페이징으로 조회
     @GetMapping("/post/{postId}")
     public DailyfeedPageResponse<CommentDto.Comment> getCommentsByPost(
@@ -99,11 +99,12 @@ public class CommentController {
     // 댓글 삭제
     @DeleteMapping("/{commentId}")
     public DailyfeedServerResponse<Boolean> deleteComment(
+            @PathVariable Long commentId,
+            @AuthenticatedMember MemberDto.Member member,
             @RequestHeader("Authorization") String authorizationHeader,
-            HttpServletResponse httpResponse,
-            @PathVariable Long commentId
+            HttpServletResponse httpResponse
     ) {
-        return commentService.deleteComment(commentId, authorizationHeader, httpResponse);
+        return commentService.deleteComment(member, commentId, authorizationHeader, httpResponse);
     }
 
     // 댓글 상세 조회
@@ -126,17 +127,21 @@ public class CommentController {
 
     // 댓글 좋아요
     @PostMapping("/{commentId}/like")
-    public DailyfeedServerResponse<Boolean> likeComment(@PathVariable Long commentId) {
-        log.info("Liking comment: {}", commentId);
-        commentService.incrementLikeCount(commentId);
+    public DailyfeedServerResponse<Boolean> likeComment(
+            @PathVariable Long commentId,
+            @AuthenticatedMember MemberDto.Member member
+    ) {
+        commentService.incrementLikeCount(member, commentId);
         return DailyfeedServerResponse.<Boolean>builder().ok("Y").statusCode("201").reason("LIKE_CREATED").data(Boolean.TRUE).build();
     }
 
     // 댓글 좋아요 취소
     @DeleteMapping("/{commentId}/like")
-    public DailyfeedServerResponse<Boolean> cancelLikeComment(@PathVariable Long commentId) {
-        log.info("Unliking comment: {}", commentId);
-        commentService.decrementLikeCount(commentId);
+    public DailyfeedServerResponse<Boolean> cancelLikeComment(
+            @PathVariable Long commentId,
+            @AuthenticatedMember MemberDto.Member member
+    ) {
+        commentService.decrementLikeCount(member, commentId);
         return DailyfeedServerResponse.<Boolean>builder().ok("Y").statusCode("204").reason("LIKE_DELETED").data(Boolean.TRUE).build();
     }
 

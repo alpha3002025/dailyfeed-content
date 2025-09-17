@@ -98,6 +98,12 @@ public class CommentService {
         CommentDto.Comment commentDto = commentMapper.toComment(savedComment, author);
         mergeAuthorData(List.of(commentDto), httpResponse);
 
+        // timeline 을 위한 활동 기록
+        publishCommentActivity(member.getId(), savedComment.getId(), CommentActivityType.CREATE);
+
+        // mongodb 에 본문 저장 (Season2 개발 예정) (TODO)
+//        insertNewDocument(savedComment);
+
         return DailyfeedServerResponse.<CommentDto.Comment>builder()
                 .ok("Y")
                 .statusCode("201")
@@ -105,6 +111,13 @@ public class CommentService {
                 .data(commentDto)
                 .build();
     }
+
+    // mongodb 에 본문 저장 (Season2 개발 예정) (TODO)
+//    public void insertNewDocument(Post post){
+//        CommentDocument document = CommentDocument
+//                .newPost(post.getId(), post.getTitle(), post.getContent(), post.getCreatedAt(), post.getUpdatedAt());
+//        commentMongoRepository.save(document);
+//    }
 
     // 댓글 수정
     public DailyfeedServerResponse<CommentDto.Comment> updateComment(MemberDto.Member member, Long commentId, CommentDto.UpdateCommentRequest request, String token, HttpServletResponse httpResponse) {
@@ -119,8 +132,15 @@ public class CommentService {
             throw new CommentModificationPermissionDeniedException();
         }
 
+        // 수정
         comment.updateContent(request.getContent());
         Comment updatedComment = commentRepository.save(comment);
+
+        // timeline 을 위한 활동 기록
+        publishCommentActivity(member.getId(), updatedComment.getId(), CommentActivityType.UPDATE);
+
+        // mongodb 에 본문 저장 (Season2 개발 예정) (TODO)
+//        updateDocument(post);
 
         // 응답 생성 및 작성자 정보 추가
         CommentDto.Comment commentUpdated = commentMapper.toComment(updatedComment, author);
@@ -134,10 +154,21 @@ public class CommentService {
                 .build();
     }
 
+    // mongodb 에 본문 저장 (Season2 개발 예정) (TODO)
+//    public void updateDocument(Post post){
+//        CommentDocument oldDocument = commentMongoRepository
+//                .findByPostPkAndIsDeletedAndIsCurrent(post.getId(), Boolean.FALSE, Boolean.TRUE)
+//                .orElseThrow(click.dailyfeed.code.domain.content.post.exception.PostNotFoundException::new);
+//
+////        oldDocument.markAsDeleted(Boolean.FALSE);
+//        CommentDocument updatedPost = CommentDocument.newUpdatedPost(oldDocument, post.getUpdatedAt());
+//
+//        commentMongoRepository.save(updatedPost);
+//    }
+
     // 댓글 삭제 (소프트 삭제)
-    public DailyfeedServerResponse<Boolean> deleteComment(Long commentId, String token, HttpServletResponse httpResponse) {
-        MemberDto.Member author = memberFeignHelper.getMember(token, httpResponse);
-        Long authorId = author.getId();
+    public DailyfeedServerResponse<Boolean> deleteComment(MemberDto.Member requestedMember, Long commentId, String token, HttpServletResponse httpResponse) {
+        Long authorId = requestedMember.getId();
 
         Comment comment = commentRepository.findByIdAndNotDeleted(commentId)
                 .orElseThrow(CommentNotFoundException::new);
@@ -147,8 +178,12 @@ public class CommentService {
             throw new CommentDeletionPermissionDeniedException();
         }
 
-        // 댓글과 모든 자식 댓글들을 소프트 삭제
+        // 댓글과 모든 자식 댓글들을 소프트 삭제 (TODO : Season2)
         commentRepository.softDeleteCommentAndChildren(commentId);
+
+        // timeline 을 위한 활동 기록
+        publishCommentActivity(requestedMember.getId(), commentId, CommentActivityType.SOFT_DELETE);
+
         return DailyfeedServerResponse.<Boolean>builder().ok("Y").statusCode("204").reason("COMMENT_DELETED").data(Boolean.TRUE).build();
     }
 
@@ -309,18 +344,20 @@ public class CommentService {
     }
 
     // 좋아요 증가
-    public void incrementLikeCount(Long commentId) {
+    public void incrementLikeCount(MemberDto.Member member, Long commentId) {
         log.info("Incrementing like count for comment: {}", commentId);
 
         // 댓글 존재 확인
-        commentRepository.findByIdAndNotDeleted(commentId)
+        Comment comment = commentRepository.findByIdAndNotDeleted(commentId)
                 .orElseThrow(CommentNotFoundException::new);
 
         commentRepository.incrementLikeCount(commentId);
+
+        publishLikeActivity(member.getId(), commentId, CommentLikeType.LIKE);
     }
 
     // 좋아요 감소
-    public void decrementLikeCount(Long commentId) {
+    public void decrementLikeCount(MemberDto.Member member, Long commentId) {
         log.info("Decrementing like count for comment: {}", commentId);
 
         // 댓글 존재 확인
@@ -328,6 +365,7 @@ public class CommentService {
                 .orElseThrow(CommentNotFoundException::new);
 
         commentRepository.decrementLikeCount(commentId);
+        publishLikeActivity(member.getId(), commentId, CommentLikeType.CANCEL);
     }
 
 
