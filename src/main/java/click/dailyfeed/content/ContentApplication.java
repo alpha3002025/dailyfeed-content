@@ -33,6 +33,7 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 @ComponentScan(basePackages = {
         "click.dailyfeed.feign",
         "click.dailyfeed.content",
+		"click.dailyfeed.pagination",
 })
 public class ContentApplication {
 

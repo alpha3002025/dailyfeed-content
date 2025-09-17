@@ -2,18 +2,26 @@ package click.dailyfeed.content.domain.comment.service;
 
 import click.dailyfeed.code.domain.content.comment.dto.CommentDto;
 import click.dailyfeed.code.domain.content.comment.exception.*;
+import click.dailyfeed.code.domain.content.comment.type.CommentActivityType;
+import click.dailyfeed.code.domain.content.comment.type.CommentLikeType;
 import click.dailyfeed.code.domain.member.member.code.MemberExceptionCode;
 import click.dailyfeed.code.domain.member.member.dto.MemberDto;
+import click.dailyfeed.code.domain.member.member.dto.MemberProfileDto;
 import click.dailyfeed.code.domain.member.member.exception.MemberException;
+import click.dailyfeed.code.global.kafka.exception.KafkaNetworkErrorException;
+import click.dailyfeed.code.global.kafka.type.DateBasedTopicType;
 import click.dailyfeed.code.global.web.response.DailyfeedPage;
 import click.dailyfeed.code.global.web.response.DailyfeedPageResponse;
 import click.dailyfeed.code.global.web.response.DailyfeedServerResponse;
 import click.dailyfeed.content.domain.comment.entity.Comment;
+import click.dailyfeed.content.domain.comment.mapper.CommentEventMapper;
 import click.dailyfeed.content.domain.comment.mapper.CommentMapper;
 import click.dailyfeed.content.domain.comment.repository.jpa.CommentRepository;
+import click.dailyfeed.content.domain.kafka.KafkaHelper;
 import click.dailyfeed.content.domain.post.entity.Post;
 import click.dailyfeed.content.domain.post.repository.jpa.PostRepository;
 import click.dailyfeed.feign.domain.member.MemberFeignHelper;
+import click.dailyfeed.pagination.mapper.PageMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +31,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -36,13 +45,16 @@ public class CommentService {
     private final CommentRepository commentRepository;
     private final PostRepository postRepository;
     private final CommentMapper commentMapper;
+    private final CommentEventMapper commentEventMapper;
+    private final PageMapper pageMapper;
     private final MemberFeignHelper memberFeignHelper;
+    private final KafkaHelper kafkaHelper;
 
     private static final int MAX_COMMENT_DEPTH = 2; // 최대 댓글 깊이 제한
 
     // 댓글 작성
-    public DailyfeedServerResponse<CommentDto.Comment> createComment(String token, CommentDto.CreateCommentRequest request, HttpServletResponse httpResponse) {
-        MemberDto.Member author = memberFeignHelper.getMember(token, httpResponse);
+    public DailyfeedServerResponse<CommentDto.Comment> createComment(MemberDto.Member member, String token, CommentDto.CreateCommentRequest request, HttpServletResponse httpResponse) {
+        MemberProfileDto.Summary author = memberFeignHelper.getMemberSummaryById(member.getId(), token, httpResponse);
         Long authorId = author.getId();
 
         // 게시글 존재 확인
@@ -95,8 +107,8 @@ public class CommentService {
     }
 
     // 댓글 수정
-    public DailyfeedServerResponse<CommentDto.Comment> updateComment(Long commentId, String token, CommentDto.UpdateCommentRequest request, HttpServletResponse httpResponse) {
-        MemberDto.Member author = memberFeignHelper.getMember(token, httpResponse);
+    public DailyfeedServerResponse<CommentDto.Comment> updateComment(MemberDto.Member member, Long commentId, CommentDto.UpdateCommentRequest request, String token, HttpServletResponse httpResponse) {
+        MemberProfileDto.Summary author = memberFeignHelper.getMemberSummaryById(member.getId(), token, httpResponse);
         Long authorId = author.getId();
 
         Comment comment = commentRepository.findByIdAndNotDeleted(commentId)
@@ -172,8 +184,6 @@ public class CommentService {
                 .build();
     }
 
-
-
     // 대댓글 목록 조회
     @Transactional(readOnly = true)
     public DailyfeedPageResponse<CommentDto.Comment> getRepliesByParent(Long parentId, int page, int size, HttpServletResponse httpResponse) {
@@ -191,7 +201,7 @@ public class CommentService {
 
         return DailyfeedPageResponse.<CommentDto.Comment>builder()
                 .ok("Y").statusCode("200").reason("SUCCESS")
-                .content(commentMapper.fromJpaCommentPage(replies, commentList))
+                .content(pageMapper.fromJpaPageToDailyfeedPage(replies, commentList))
                 .build();
     }
 
@@ -234,27 +244,28 @@ public class CommentService {
 
     public DailyfeedPage<CommentDto.CommentSummary> mergeAuthorData(Page<Comment> commentsPage, HttpServletResponse httpResponse) {
         List<CommentDto.CommentSummary> summaries = commentsPage.getContent().stream().map(commentMapper::toCommentSummary).collect(Collectors.toList());
-        if (summaries.isEmpty()) return commentMapper.emptyPage();
+        if (summaries.isEmpty()) return pageMapper.emptyPage();
 
         Set<Long> authorIds = summaries.stream()
                 .map(CommentDto.CommentSummary::getAuthorId)
                 .collect(Collectors.toSet());
 
-        Map<Long, MemberDto.Member> authorMap = memberFeignHelper.getMemberMap(authorIds, httpResponse);
+        Map<Long, MemberProfileDto.Summary> authorMap = memberFeignHelper.getMemberMap(authorIds, httpResponse);
 
         summaries.forEach(summary -> {
-            MemberDto.Member author = authorMap.get(summary.getAuthorId());
+            MemberProfileDto.Summary author = authorMap.get(summary.getAuthorId());
             if (author != null) {
                 summary.updateAuthor(author);
             }
         });
 
-        return commentMapper.fromJpaCommentPage(commentsPage, summaries);
+
+        return pageMapper.fromJpaPageToDailyfeedPage(commentsPage, summaries);
     }
 
     // 계층구조 댓글에 작성자 정보 추가 (재귀적)
     private DailyfeedPage<CommentDto.Comment> mergeAuthorDataRecursively(Page<Comment> commentsPage, HttpServletResponse httpResponse) {
-        if(commentsPage.isEmpty()) return commentMapper.emptyPage();
+        if(commentsPage.isEmpty()) return pageMapper.emptyPage();
 
         List<CommentDto.Comment> commentList = commentsPage.getContent().stream().map(commentMapper::toComment).collect(Collectors.toList());
 
@@ -262,16 +273,16 @@ public class CommentService {
                 .map(CommentDto.Comment::getAuthorId)
                 .collect(Collectors.toSet());
 
-        Map<Long, MemberDto.Member> authorMap = memberFeignHelper.getMemberMap(authorIds, httpResponse);
+        Map<Long, MemberProfileDto.Summary> authorMap = memberFeignHelper.getMemberMap(authorIds, httpResponse);
 
         commentList.forEach(comment -> {
-            MemberDto.Member author = authorMap.get(comment.getAuthorId());
+            MemberProfileDto.Summary author = authorMap.get(comment.getAuthorId());
             if (author != null) {
                 comment.updateAuthorRecursively(authorMap);
             }
         });
 
-        return commentMapper.fromJpaCommentPage(commentsPage, commentList);
+        return pageMapper.fromJpaPageToDailyfeedPage(commentsPage, commentList);
 
     }
 
@@ -283,10 +294,10 @@ public class CommentService {
                 .collect(Collectors.toSet());
 
         try {
-            Map<Long, MemberDto.Member> authorMap = memberFeignHelper.getMemberMap(authorIds, httpResponse);
+            Map<Long, MemberProfileDto.Summary> authorMap = memberFeignHelper.getMemberMap(authorIds, httpResponse);
 
             comments.forEach(comment -> {
-                MemberDto.Member author = authorMap.get(comment.getAuthorId());
+                MemberProfileDto.Summary author = authorMap.get(comment.getAuthorId());
                 if (author != null) {
                     comment.updateAuthor(author);
                 }
@@ -321,6 +332,35 @@ public class CommentService {
 
 
     ///  helpers ///
+    /// 댓글 생성/삭제 이벤트
+    public void publishCommentActivity(Long memberId, Long commentId, CommentActivityType activityType) {
+        try{
+            LocalDateTime now = commentEventMapper.currentDateTime();
+            String topicName = DateBasedTopicType.POST_ACTIVITY.generateTopicName(now);
+            CommentDto.CommentActivityEvent activityEvent = commentEventMapper.newCommentActivityEvent(commentId, memberId, activityType, now);
+            kafkaHelper.send(topicName, commentId.toString(), activityEvent);
+        }
+        catch (Exception e){
+            log.error("Error publishing post activity event: ", e);
+            throw new KafkaNetworkErrorException();
+        }
+    }
+
+    /// 댓글 좋아요/좋아요 취소 이벤트
+    public void publishLikeActivity(Long memberId, Long commentId, CommentLikeType commentLikeType) {
+        try{
+            LocalDateTime now = commentEventMapper.currentDateTime();
+            String topicName = DateBasedTopicType.COMMENT_LIKE_ACTIVITY.generateTopicName(now);
+            CommentDto.LikeActivityEvent activityEvent = commentEventMapper.newLikeActivityEvent(commentId, memberId, commentLikeType, now);
+            kafkaHelper.send(topicName, commentId.toString(), activityEvent);
+        }
+        catch (Exception e){
+            log.error("Error publishing post activity event: ", e);
+            throw new KafkaNetworkErrorException();
+        }
+
+    }
+
     /// 글 조회
     public Post getPostByIdOrThrow(Long postId) {
         return postRepository.findByIdAndNotDeleted(postId).orElseThrow(PostNotFoundException::new);

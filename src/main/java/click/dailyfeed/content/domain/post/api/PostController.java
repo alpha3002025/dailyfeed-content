@@ -45,9 +45,10 @@ public class PostController {
     public DailyfeedServerResponse<PostDto.Post> createPost(
             @AuthenticatedMember MemberDto.Member member,
             @Valid @RequestBody PostDto.CreatePostRequest request,
+            @RequestHeader(value = "Authorization", required = false) String token,
             HttpServletResponse response ) {
 
-        return postService.createPost(member, request, response);
+        return postService.createPost(member, request, token, response);
     }
 
     // 게시글 수정
@@ -55,10 +56,11 @@ public class PostController {
     @PutMapping("/{postId}")
     public DailyfeedServerResponse<PostDto.Post> updatePost(
             @AuthenticatedMember MemberDto.Member member,
+            @RequestHeader(value = "Authorization", required = false) String token,
             HttpServletResponse httpResponse,
             @PathVariable Long postId,
             @Valid @RequestBody PostDto.UpdatePostRequest updateRequest ) {
-        return postService.updatePost(member, postId, updateRequest, httpResponse);
+        return postService.updatePost(member, postId, updateRequest, token, httpResponse);
     }
 
     // 게시글 삭제
@@ -79,7 +81,7 @@ public class PostController {
             @RequestHeader(value = "Authorization", required = false) String token,
             HttpServletResponse httpResponse,
             @PathVariable Long postId) {
-        return postService.getPost(postId, token, httpResponse);
+        return postService.getPost(member, postId, token, httpResponse);
     }
 
     // 게시글 좋아요 증가
@@ -114,23 +116,6 @@ public class PostController {
             ) Pageable pageable) {
         return postService.getPostsByAuthor(token, pageable, httpResponse);
     }
-
-    // TODO (삭제) timeline+contents 서비스로 이관
-//    // 팔로잉 게시글 목록 조회
-//    // (timeline 으로 이관 예정(/timeline/feed))
-//    @Operation(summary = "팔로잉 사용자들의 게시물 조회 (피드)", description = "팔로잉한 사용자들의 게시물을 시간순으로 조회합니다.")
-//    @GetMapping("/feed")
-//    public DailyfeedPageResponse<PostDto.Post> getFeed(
-//            HttpServletResponse httpResponse,
-//            @RequestHeader("Authorization") String authorizationHeader,
-//            @PageableDefault(
-//                    page = 0,
-//                    size = 15,
-//                    sort = "createdAt",
-//                    direction = Sort.Direction.DESC
-//            ) Pageable pageable) {
-//        return postService.getRecentlyActiveFollowingMembersPosts(authorizationHeader, pageable, httpResponse);
-//    }
 
     // 특정 기간 내 게시글 조회
     // (timeline 으로 이관 예정(/timeline/feed/search/period))
@@ -187,25 +172,4 @@ public class PostController {
 
         return postService.searchPosts(keyword, page, size, httpResponse);
     }
-
-//    // 관리자용: 작성자별 게시글 일괄 삭제
-//    @DeleteMapping("/admin/author/{authorId}")
-//    public ServerResponse<Integer> deletePostsByAuthor(
-//            @PathVariable Long authorId,
-//            @RequestHeader("X-Admin-Auth") String adminToken) {
-//
-//        log.info("Admin deleting all posts by author: {}", authorId);
-//
-//        // 관리자 권한 검증 로직 (todo :: 어드민 기능도 염두에 두었으나, 현재 버전에서는 보류)
-//        // validateAdminToken(adminToken);
-//
-//        int deletedCount = postService.deletePostsByAuthor(authorId);
-//
-//        return ServerResponse.<Integer>builder()
-//                .data(deletedCount)
-//                .ok("Y")
-//                .statusCode("200")
-//                .reason("SUCCESS")
-//                .build();
-//    }
 }

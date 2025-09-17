@@ -1,9 +1,11 @@
 package click.dailyfeed.content.domain.comment.api;
 
 import click.dailyfeed.code.domain.content.comment.dto.CommentDto;
+import click.dailyfeed.code.domain.member.member.dto.MemberDto;
 import click.dailyfeed.code.global.web.response.DailyfeedPageResponse;
 import click.dailyfeed.code.global.web.response.DailyfeedServerResponse;
 import click.dailyfeed.content.domain.comment.service.CommentService;
+import click.dailyfeed.feign.config.web.AuthenticatedMember;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -24,10 +26,11 @@ public class CommentController {
     // 댓글 작성
     @PostMapping("/")
     public DailyfeedServerResponse<CommentDto.Comment> createComment(
+            @AuthenticatedMember MemberDto.Member member,
             @RequestHeader("Authorization") String authorizationHeader,
             HttpServletResponse httpResponse,
             @Valid @RequestBody CommentDto.CreateCommentRequest request) {
-        return commentService.createComment(authorizationHeader, request, httpResponse);
+        return commentService.createComment(member, authorizationHeader, request, httpResponse);
     }
 
     // 내 댓글 목록
@@ -85,11 +88,12 @@ public class CommentController {
     // 댓글 수정
     @PutMapping("/{commentId}")
     public DailyfeedServerResponse<CommentDto.Comment> updateComment(
+            @AuthenticatedMember MemberDto.Member member,
             @RequestHeader("Authorization") String authorizationHeader,
             HttpServletResponse httpResponse,
             @PathVariable Long commentId,
             @Valid @RequestBody CommentDto.UpdateCommentRequest request) {
-        return commentService.updateComment(commentId, authorizationHeader, request, httpResponse);
+        return commentService.updateComment(member, commentId, request, authorizationHeader, httpResponse);
     }
 
     // 댓글 삭제

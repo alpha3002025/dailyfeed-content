@@ -5,31 +5,35 @@ import click.dailyfeed.code.domain.content.post.exception.PostDeleteForbiddenExc
 import click.dailyfeed.code.domain.content.post.exception.PostNotFoundException;
 import click.dailyfeed.code.domain.content.post.exception.PostUpdateForbiddenException;
 import click.dailyfeed.code.domain.content.post.type.PostActivityType;
+import click.dailyfeed.code.domain.content.post.type.PostLikeType;
 import click.dailyfeed.code.domain.member.member.dto.MemberDto;
+import click.dailyfeed.code.domain.member.member.dto.MemberProfileDto;
 import click.dailyfeed.code.domain.member.member.exception.MemberNotFoundException;
 import click.dailyfeed.code.global.kafka.exception.KafkaNetworkErrorException;
+import click.dailyfeed.code.global.kafka.type.DateBasedTopicType;
 import click.dailyfeed.code.global.web.response.DailyfeedPage;
 import click.dailyfeed.code.global.web.response.DailyfeedPageResponse;
 import click.dailyfeed.code.global.web.response.DailyfeedServerResponse;
+import click.dailyfeed.content.domain.kafka.KafkaHelper;
 import click.dailyfeed.content.domain.post.document.PostDocument;
 import click.dailyfeed.content.domain.post.entity.Post;
+import click.dailyfeed.content.domain.post.mapper.PostEventMapper;
 import click.dailyfeed.content.domain.post.mapper.PostMapper;
 import click.dailyfeed.content.domain.post.repository.jpa.PostRepository;
 import click.dailyfeed.content.domain.post.repository.mongo.PostMongoRepository;
 import click.dailyfeed.feign.domain.member.MemberFeignHelper;
 import click.dailyfeed.feign.domain.post.PostFeignHelper;
+import click.dailyfeed.pagination.mapper.PageMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -41,13 +45,13 @@ import java.util.stream.Collectors;
 @Service
 public class PostService {
     private final PostRepository postRepository;
-    private final PostMapper postMapper;
-    private final MemberFeignHelper memberFeignHelper;
-    private final KafkaTemplate<String, Object> kafkaTemplate;
     private final PostMongoRepository postMongoRepository;
+    private final PostMapper postMapper;
+    private final PostEventMapper postEventMapper;
+    private final PageMapper pageMapper;
+    private final MemberFeignHelper memberFeignHelper;
     private final PostFeignHelper postFeignHelper;
-
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
+    private final KafkaHelper kafkaHelper;
 
     // TODO (작명 수정 필요) :: BULK REQUEST 네이밍 변경 필요  🫡
     // 특정 post id 리스트에 해당하는 post 리스트 조회
@@ -59,9 +63,10 @@ public class PostService {
     }
 
     // 게시글 작성
-    public DailyfeedServerResponse<PostDto.Post> createPost(MemberDto.Member author, PostDto.CreatePostRequest request, HttpServletResponse response) {
+    public DailyfeedServerResponse<PostDto.Post> createPost(MemberDto.Member author, PostDto.CreatePostRequest request, String token, HttpServletResponse response) {
         // 작성자 정보 확인
         Long authorId = author.getId();
+        MemberProfileDto.Summary memberSummary = memberFeignHelper.getMemberSummaryById(authorId, token, response);
 
         // 본문 저장
         Post post = Post.newPost(request.getTitle(), request.getContent(), authorId);
@@ -75,7 +80,7 @@ public class PostService {
 
         // return
         return DailyfeedServerResponse.<PostDto.Post>builder()
-                .data(postMapper.toPostDto(savedPost, author, 0))
+                .data(postMapper.toPostDto(post, memberSummary))
                 .ok("Y")
                 .statusCode("201")
                 .reason("SUCCESS")
@@ -89,7 +94,7 @@ public class PostService {
     }
 
     // 게시글 수정
-    public DailyfeedServerResponse<PostDto.Post> updatePost(MemberDto.Member author, Long postId, PostDto.UpdatePostRequest request, HttpServletResponse response) {
+    public DailyfeedServerResponse<PostDto.Post> updatePost(MemberDto.Member author, Long postId, PostDto.UpdatePostRequest request, String token, HttpServletResponse response) {
         Post post = postRepository.findByIdAndNotDeleted(postId)
                 .orElseThrow(PostNotFoundException::new);
 
@@ -97,6 +102,8 @@ public class PostService {
         if (!post.isAuthor(author.getId())) {
             throw new PostUpdateForbiddenException();
         }
+
+        MemberProfileDto.Summary memberSummary = memberFeignHelper.getMemberSummaryById(author.getId(), token, response);
 
         // 수정 요청 반영
         post.updatePost(request.getTitle(), request.getContent());
@@ -112,7 +119,7 @@ public class PostService {
                 .ok("Y")
                 .statusCode("200")
                 .reason("SUCCESS")
-                .data(postMapper.toPostDto(post, author))
+                .data(postMapper.toPostDto(post, memberSummary))
                 .build();
     }
 
@@ -127,31 +134,25 @@ public class PostService {
         postMongoRepository.save(updatedPost);
     }
 
+    public void publishLikeActivity(Long memberId, Long postId, PostLikeType postLikeType) {
+        try{
+            LocalDateTime now = postEventMapper.currentDateTime();
+            String topicName = DateBasedTopicType.POST_LIKE_ACTIVITY.generateTopicName(now);
+            PostDto.LikeActivityEvent activityEvent = postEventMapper.newLikeActivityEvent(postId, memberId, postLikeType, now);
+            kafkaHelper.send(topicName, postId.toString(), activityEvent);
+        }
+        catch (Exception e){
+            log.error("Error publishing post activity event: ", e);
+            throw new KafkaNetworkErrorException();
+        }
+    }
+
     public void publishPostActivity(Long memberId, Long postId, PostActivityType activityType) {
         try{
-            LocalDateTime now = LocalDateTime.now();
-            String currentDate = now.format(DATE_FORMATTER);
-            String topicName = "post-activity-" + currentDate;
-
-            PostDto.PostActivityEvent activityEvent = PostDto.PostActivityEvent.builder()
-                    .memberId(memberId)
-                    .followingId(null) // 팔로우 관련 정보는 별도 처리 필요시 추가
-                    .postId(postId)
-                    .postActivityType(activityType)
-                    .createdAt(now)
-                    .updatedAt(now)
-                    .build();
-
-            kafkaTemplate.send(topicName, postId.toString(), activityEvent)
-                    .whenComplete((result, throwable) -> {
-                        if (throwable != null) {
-                            log.error("Failed to send post activity event to topic: {}, postId: {}, activityType: {}",
-                                    topicName, postId, activityType, throwable);
-                        } else {
-                            log.info("Successfully sent post activity event to topic: {}, postId: {}, activityType: {}",
-                                    topicName, postId, activityType);
-                        }
-                    });
+            LocalDateTime now = postEventMapper.currentDateTime();
+            String topicName = DateBasedTopicType.POST_ACTIVITY.generateTopicName(now);
+            PostDto.PostActivityEvent activityEvent = postEventMapper.newPostActivityEvent(postId, memberId, activityType, now);
+            kafkaHelper.send(topicName, postId.toString(), activityEvent);
         }
         catch (Exception e){
             log.error("Error publishing post activity event: ", e);
@@ -196,12 +197,14 @@ public class PostService {
 
     // 게시글 상세 조회 (조회수 증가)
     @Transactional(readOnly = true)
-    public DailyfeedServerResponse<PostDto.Post> getPost(Long postId, String token, HttpServletResponse response) {
+    public DailyfeedServerResponse<PostDto.Post> getPost(MemberDto.Member member, Long postId, String token, HttpServletResponse response) {
         Post post = postRepository.findByIdAndNotDeleted(postId)
                 .orElseThrow(PostNotFoundException::new);
 
         // 조회수 증가 (별도 트랜잭션으로 처리)
         post.incrementLikeCount();
+
+        MemberProfileDto.Summary authorSummary = memberFeignHelper.getMemberSummaryById(post.getAuthorId(), token, response);
 
         // 작성자 정보 조회
         MemberDto.Member author = memberFeignHelper.getMemberById(post.getAuthorId(), token, response);
@@ -210,7 +213,7 @@ public class PostService {
                 .ok("Y")
                 .statusCode("200")
                 .reason("SUCCESS")
-                .data(postMapper.toPostDto(post, author))
+                .data(postMapper.toPostDto(post, authorSummary))
                 .build();
     }
 
@@ -222,7 +225,7 @@ public class PostService {
         Pageable pageable = PageRequest.of(page, size);
         Page<Post> posts = postRepository.findAllNotDeletedOrderByCreatedDateDesc(pageable);
 
-        DailyfeedPage<PostDto.Post> postDailyfeedPage = postMapper.fromJpaPostPage(posts, mergeAuthorAndCommentCount(posts.getContent(), httpResponse));
+        DailyfeedPage<PostDto.Post> postDailyfeedPage = pageMapper.fromJpaPageToDailyfeedPage(posts, mergeAuthorAndCommentCount(posts.getContent(), httpResponse));
         return DailyfeedPageResponse.<PostDto.Post>builder()
                 .ok("Y").statusCode("200").reason("SUCCESS")
                 .content(postDailyfeedPage)
@@ -274,45 +277,13 @@ public class PostService {
         }
 
         Page<Post> posts = postRepository.findByAuthorIdAndNotDeleted(author.getId(), pageable);
-        DailyfeedPage<PostDto.Post> postDailyfeedPage = postMapper.fromJpaPostPage(posts, mergeAuthorAndCommentCount(posts.getContent(), httpResponse));
+        DailyfeedPage<PostDto.Post> postDailyfeedPage = pageMapper.fromJpaPageToDailyfeedPage(posts, mergeAuthorAndCommentCount(posts.getContent(), httpResponse));
 
         return DailyfeedPageResponse.<PostDto.Post>builder()
                 .ok("Y").statusCode("200").reason("SUCCESS")
                 .content(postDailyfeedPage)
                 .build();
     }
-
-    // TODO (삭제) timeline+contents 서비스로 이관
-//    public DailyfeedPageResponse<PostDto.Post> getRecentlyActiveFollowingMembersPosts(String token, Pageable pageable, HttpServletResponse httpResponse) {
-//        // 작성자 정보 확인
-//        MemberDto.Member member = memberFeignHelper.getMember(token, httpResponse);
-//        if (member == null) {
-//            throw new MemberNotFoundException(() -> "삭제된 사용자의 접근입니다.");
-//        }
-//
-//        // 팔로잉하고 있는 멤버들의 최근 활동(최신순 정렬)
-//        DailyfeedPage<FollowDto.FollowingActivity> recentFollowersActivities = memberFeignHelper.getRecentlyActiveFollowingMembers(token, httpResponse);
-//        // Post ID 추출
-//        List<FollowDto.FollowingActivity> content = recentFollowersActivities.getContent();
-//        Set<Long> postIds = content.stream().map(FollowDto.FollowingActivity::getPostId).collect(Collectors.toSet());
-//
-//        // 팔로잉 멤버가 없거나 팔로잉 멤버들의 활동이 전혀 없을 경우 인기게시물 노출
-//        if(postIds == null || postIds.isEmpty()) {
-//            return getPopularPosts(pageable.getPageSize(), pageable.getPageNumber(), httpResponse);
-//        }
-//
-//        // Post ID에 대한 게시글 조회
-//        Page<Post> postPage = postRepository.findPostsWithCommentsByPostIds(postIds, pageable);
-//
-//        // 댓글 수, 작가 정보 조합
-//        List<PostDto.Post> posts = mergeAuthorAndCommentCount(postPage.getContent(), httpResponse);
-//        DailyfeedPage<PostDto.Post> postDailyfeedPage = postMapper.fromJpaPostPage(postPage, posts);
-//
-//        return DailyfeedPageResponse.<PostDto.Post>builder()
-//                .ok("Y").statusCode("200").reason("SUCCESS")
-//                .content(postDailyfeedPage)
-//                .build();
-//    }
 
     // 댓글이 많은 게시글 조회 (댓글 수로 정렬)
     @Transactional(readOnly = true)
@@ -322,7 +293,7 @@ public class PostService {
         Pageable pageable = PageRequest.of(page, size);
         Page<Post> posts = postRepository.findMostCommentedPosts(pageable);
 
-        DailyfeedPage<PostDto.Post> postDailyfeedPage = postMapper.fromJpaPostPage(posts, mergeAuthorAndCommentCount(posts.getContent(), httpResponse));
+        DailyfeedPage<PostDto.Post> postDailyfeedPage = pageMapper.fromJpaPageToDailyfeedPage(posts, mergeAuthorAndCommentCount(posts.getContent(), httpResponse));
         return DailyfeedPageResponse.<PostDto.Post>builder()
                 .ok("Y").statusCode("200").reason("SUCCESS")
                 .content(postDailyfeedPage)
@@ -337,7 +308,7 @@ public class PostService {
         Pageable pageable = PageRequest.of(page, size);
         Page<Post> posts = postRepository.findPopularPostsNotDeleted(pageable);
 
-        DailyfeedPage<PostDto.Post> postDailyfeedPage = postMapper.fromJpaPostPage(posts, mergeAuthorAndCommentCount(posts.getContent(), httpResponse));
+        DailyfeedPage<PostDto.Post> postDailyfeedPage = pageMapper.fromJpaPageToDailyfeedPage(posts, mergeAuthorAndCommentCount(posts.getContent(), httpResponse));
         return DailyfeedPageResponse.<PostDto.Post>builder()
                 .ok("Y").statusCode("200").reason("SUCCESS")
                 .content(postDailyfeedPage)
@@ -352,7 +323,7 @@ public class PostService {
         Pageable pageable = PageRequest.of(page, size);
         Page<Post> posts = postRepository.findPostsByRecentActivity(pageable);
 
-        DailyfeedPage<PostDto.Post> postDailyfeedPage = postMapper.fromJpaPostPage(posts, mergeAuthorAndCommentCount(posts.getContent(), httpResponse));
+        DailyfeedPage<PostDto.Post> postDailyfeedPage = pageMapper.fromJpaPageToDailyfeedPage(posts, mergeAuthorAndCommentCount(posts.getContent(), httpResponse));
         return DailyfeedPageResponse.<PostDto.Post>builder()
                 .ok("Y").statusCode("200").reason("SUCCESS")
                 .content(postDailyfeedPage)
@@ -367,7 +338,7 @@ public class PostService {
         Pageable pageable = PageRequest.of(page, size);
         Page<Post> posts = postRepository.findByTitleOrContentContainingAndNotDeleted(keyword, pageable);
 
-        DailyfeedPage<PostDto.Post> postDailyfeedPage = postMapper.fromJpaPostPage(posts, mergeAuthorAndCommentCount(posts.getContent(), httpResponse));
+        DailyfeedPage<PostDto.Post> postDailyfeedPage = pageMapper.fromJpaPageToDailyfeedPage(posts, mergeAuthorAndCommentCount(posts.getContent(), httpResponse));
         return DailyfeedPageResponse.<PostDto.Post>builder()
                 .ok("Y").statusCode("200").reason("SUCCESS")
                 .content(postDailyfeedPage)
@@ -381,7 +352,7 @@ public class PostService {
                 .collect(Collectors.toSet());
 
         // (2) 작성자 상세 정보
-        Map<Long, MemberDto.Member> authorsMap = memberFeignHelper.getMemberMap(authorIds, httpResponse);
+        Map<Long, MemberProfileDto.Summary> authorsMap = memberFeignHelper.getMemberMap(authorIds, httpResponse);
 
         return posts.stream()
                 .map(post -> {
@@ -398,7 +369,7 @@ public class PostService {
         Pageable pageable = PageRequest.of(page, size);
         Page<Post> posts = postRepository.findByCreatedDateBetweenAndNotDeleted(startDate, endDate, pageable);
 
-        DailyfeedPage<PostDto.Post> postDailyfeedPage = postMapper.fromJpaPostPage(posts, mergeAuthorAndCommentCount(posts.getContent(), httpResponse));
+        DailyfeedPage<PostDto.Post> postDailyfeedPage = pageMapper.fromJpaPageToDailyfeedPage(posts, mergeAuthorAndCommentCount(posts.getContent(), httpResponse));
         return DailyfeedPageResponse.<PostDto.Post>builder()
                 .ok("Y").statusCode("200").reason("SUCCESS")
                 .content(postDailyfeedPage)
