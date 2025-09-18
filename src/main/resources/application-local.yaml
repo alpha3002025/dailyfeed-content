@@ -34,7 +34,7 @@ spring:
       host: ${REDIS_HOST:redis-master.infra.svc.cluster.local}
     mongodb:
       protocol: mongodb # mongodb+srv or mongodb (atlas 에서만 mongodb+srv)
-      uri: ${MONGODB_CONNECTION_URI:mongodb://dailyfeed:hitEnter###@mongodb.infra.svc.cluster.local:27017/dailyfeed}
+      uri: ${MONGODB_CONNECTION_URI:mongodb://dailyfeed:hitEnter###@localhost:27017/dailyfeed}
   ## kafka
   kafka:
     bootstrap-servers: ${KAFKA_HOST:localhost}:${KAFKA_PORT:29092}

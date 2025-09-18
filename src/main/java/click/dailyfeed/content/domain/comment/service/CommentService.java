@@ -14,10 +14,12 @@ import click.dailyfeed.code.global.web.code.ResponseSuccessCode;
 import click.dailyfeed.code.global.web.page.DailyfeedPage;
 import click.dailyfeed.code.global.web.response.DailyfeedPageResponse;
 import click.dailyfeed.code.global.web.response.DailyfeedServerResponse;
+import click.dailyfeed.content.domain.comment.document.CommentDocument;
 import click.dailyfeed.content.domain.comment.entity.Comment;
 import click.dailyfeed.content.domain.comment.mapper.CommentEventMapper;
 import click.dailyfeed.content.domain.comment.mapper.CommentMapper;
 import click.dailyfeed.content.domain.comment.repository.jpa.CommentRepository;
+import click.dailyfeed.content.domain.comment.repository.mongo.CommentMongoRepository;
 import click.dailyfeed.content.domain.kafka.KafkaHelper;
 import click.dailyfeed.content.domain.post.entity.Post;
 import click.dailyfeed.content.domain.post.repository.jpa.PostRepository;
@@ -46,6 +48,7 @@ import java.util.stream.Collectors;
 public class CommentService {
     private final CommentRepository commentRepository;
     private final PostRepository postRepository;
+    private final CommentMongoRepository commentMongoRepository;
     private final CommentMapper commentMapper;
     private final CommentEventMapper commentEventMapper;
     private final PageMapper pageMapper;
@@ -104,7 +107,7 @@ public class CommentService {
         publishCommentActivity(member.getId(), savedComment.getId(), CommentActivityType.CREATE);
 
         // mongodb 에 본문 저장 (Season2 개발 예정) (TODO)
-//        insertNewDocument(savedComment);
+        insertNewDocument(post, savedComment);
 
         return DailyfeedServerResponse.<CommentDto.Comment>builder()
                 .status(HttpStatus.OK.value())
@@ -113,12 +116,11 @@ public class CommentService {
                 .build();
     }
 
-//     mongodb 에 본문 저장 (TODO)
-//    public void insertNewDocument(Post post){
-//        CommentDocument document = CommentDocument
-//                .newPost(post.getId(), post.getTitle(), post.getContent(), post.getCreatedAt(), post.getUpdatedAt());
-//        commentMongoRepository.save(document);
-//    }
+    public void insertNewDocument(Post post, Comment comment){
+        CommentDocument document = CommentDocument
+                .newComment(post.getId(), comment.getId(), comment.getContent(), comment.getCreatedAt(), comment.getUpdatedAt());
+        commentMongoRepository.save(document);
+    }
 
     // 댓글 수정
     public DailyfeedServerResponse<CommentDto.Comment> updateComment(MemberDto.Member member, Long commentId, CommentDto.UpdateCommentRequest request, String token, HttpServletResponse httpResponse) {
@@ -140,8 +142,8 @@ public class CommentService {
         // timeline 을 위한 활동 기록
         publishCommentActivity(member.getId(), updatedComment.getId(), CommentActivityType.UPDATE);
 
-        // mongodb 에 본문 저장 (Season2 개발 예정) (TODO)
-//        updateDocument(post);
+        // mongodb 에 본문 저장
+        updateDocument(comment);
 
         // 응답 생성 및 작성자 정보 추가
         CommentDto.Comment commentUpdated = commentMapper.toCommentNonRecursive(updatedComment, author);
@@ -154,17 +156,17 @@ public class CommentService {
                 .build();
     }
 
-    // mongodb 에 본문 저장 (TODO)
-//    public void updateDocument(Post post){
-//        CommentDocument oldDocument = commentMongoRepository
-//                .findByPostPkAndIsDeletedAndIsCurrent(post.getId(), Boolean.FALSE, Boolean.TRUE)
-//                .orElseThrow(click.dailyfeed.code.domain.content.post.exception.PostNotFoundException::new);
-//
-////        oldDocument.markAsDeleted(Boolean.FALSE);
-//        CommentDocument updatedPost = CommentDocument.newUpdatedPost(oldDocument, post.getUpdatedAt());
-//
-//        commentMongoRepository.save(updatedPost);
-//    }
+    // 본문 검색 용도의 컬렉션 'comments' 에 저장
+    public void updateDocument(Comment comment){
+        CommentDocument oldDocument = commentMongoRepository
+                .findByCommentPkAndIsDeletedAndIsCurrent(comment.getId(), Boolean.FALSE, Boolean.TRUE)
+                .orElseThrow(click.dailyfeed.code.domain.content.post.exception.PostNotFoundException::new);
+
+        oldDocument.softDelete();
+        CommentDocument updatedPost = CommentDocument.newUpdatedPost(oldDocument, comment.getUpdatedAt());
+
+        commentMongoRepository.save(updatedPost);
+    }
 
     // 댓글 삭제 (소프트 삭제)
     public DailyfeedServerResponse<Boolean> deleteComment(MemberDto.Member requestedMember, Long commentId, String token, HttpServletResponse httpResponse) {

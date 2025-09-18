@@ -1,0 +1,91 @@
+package click.dailyfeed.content.domain.comment.document;
+
+import click.dailyfeed.content.domain.post.document.PostDocument;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import org.bson.types.ObjectId;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.mapping.Field;
+
+import java.time.LocalDateTime;
+
+@Getter
+@NoArgsConstructor
+@AllArgsConstructor
+@Document(collection = "comments")
+public class CommentDocument {
+    @Id
+    private ObjectId id;
+
+    @Field("post_pk")
+    private Long postPk;
+
+    @Field("comment_pk")
+    private Long commentPk;
+
+    private String content;
+
+    @Field("created_at")
+    private LocalDateTime createdAt;
+
+    @Field("updated_at")
+    private LocalDateTime updatedAt;
+
+    @Field("is_deleted")
+    private Boolean isDeleted;
+
+    @Field("is_current")
+    private Boolean isCurrent;
+
+    @Field("version")
+    private Integer version;
+
+    @Builder(builderMethodName = "newCommentBuilder", builderClassName = "NewPost")
+    private CommentDocument(Long postPk, Long commentPk, String content, LocalDateTime createdAt, LocalDateTime updatedAt) {
+        this.postPk = postPk;
+        this.commentPk = commentPk;
+        this.content = content;
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
+        this.isDeleted = false;
+        this.isCurrent = true;
+        this.version = 1;
+    }
+
+    @Builder(builderMethodName = "updatedCommentBuilder", builderClassName = "UpdatedPost")
+    private CommentDocument(CommentDocument oldDocument, LocalDateTime updatedAt) {
+        this.postPk = oldDocument.getPostPk();
+        this.commentPk = oldDocument.getCommentPk();
+        this.content = oldDocument.getContent();
+        this.createdAt = oldDocument.getCreatedAt();
+        this.updatedAt =  updatedAt;
+        this.isDeleted = Boolean.FALSE;
+        this.isCurrent = Boolean.TRUE;
+        this.version = oldDocument.getVersion() + 1;
+    }
+
+    public static CommentDocument newComment(Long postPk, Long commentPk, String content, LocalDateTime createdAt, LocalDateTime updatedAt){
+        return CommentDocument.newCommentBuilder()
+                .postPk(postPk)
+                .commentPk(commentPk)
+                .content(content)
+                .createdAt(createdAt)
+                .updatedAt(updatedAt)
+                .build();
+    }
+
+    // 글 수정시 기존 post 도큐먼트는 isCurrent = false 처리, 기존 도큐먼트를 복사한 새로운 도큐먼트를 추가 후 isCurrent = true 로 지정
+    public static CommentDocument newUpdatedPost(CommentDocument commentDocument, LocalDateTime updatedAt){
+        return CommentDocument.updatedCommentBuilder()
+                .oldDocument(commentDocument)
+                .updatedAt(updatedAt)
+                .build();
+    }
+
+    public void softDelete(){
+        this.isDeleted = true;
+    }
+}
