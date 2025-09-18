@@ -10,7 +10,8 @@ import click.dailyfeed.code.domain.member.member.dto.MemberProfileDto;
 import click.dailyfeed.code.domain.member.member.exception.MemberException;
 import click.dailyfeed.code.global.kafka.exception.KafkaNetworkErrorException;
 import click.dailyfeed.code.global.kafka.type.DateBasedTopicType;
-import click.dailyfeed.code.global.web.response.DailyfeedPage;
+import click.dailyfeed.code.global.web.code.ResponseSuccessCode;
+import click.dailyfeed.code.global.web.page.DailyfeedPage;
 import click.dailyfeed.code.global.web.response.DailyfeedPageResponse;
 import click.dailyfeed.code.global.web.response.DailyfeedServerResponse;
 import click.dailyfeed.content.domain.comment.entity.Comment;
@@ -28,6 +29,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -105,14 +107,13 @@ public class CommentService {
 //        insertNewDocument(savedComment);
 
         return DailyfeedServerResponse.<CommentDto.Comment>builder()
-                .ok("Y")
-                .statusCode("201")
-                .reason("COMMENT_ADDED")
-                .data(commentDto)
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
+                .content(commentDto)
                 .build();
     }
 
-    // mongodb 에 본문 저장 (Season2 개발 예정) (TODO)
+//     mongodb 에 본문 저장 (TODO)
 //    public void insertNewDocument(Post post){
 //        CommentDocument document = CommentDocument
 //                .newPost(post.getId(), post.getTitle(), post.getContent(), post.getCreatedAt(), post.getUpdatedAt());
@@ -147,14 +148,13 @@ public class CommentService {
         mergeAuthorData(List.of(commentUpdated), httpResponse);
 
         return DailyfeedServerResponse.<CommentDto.Comment>builder()
-                .ok("Y")
-                .statusCode("200")
-                .reason("COMMENT_UPDATED")
-                .data(commentUpdated)
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
+                .content(commentUpdated)
                 .build();
     }
 
-    // mongodb 에 본문 저장 (Season2 개발 예정) (TODO)
+    // mongodb 에 본문 저장 (TODO)
 //    public void updateDocument(Post post){
 //        CommentDocument oldDocument = commentMongoRepository
 //                .findByPostPkAndIsDeletedAndIsCurrent(post.getId(), Boolean.FALSE, Boolean.TRUE)
@@ -184,7 +184,11 @@ public class CommentService {
         // timeline 을 위한 활동 기록
         publishCommentActivity(requestedMember.getId(), commentId, CommentActivityType.SOFT_DELETE);
 
-        return DailyfeedServerResponse.<Boolean>builder().ok("Y").statusCode("204").reason("COMMENT_DELETED").data(Boolean.TRUE).build();
+        return DailyfeedServerResponse.<Boolean>builder()
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
+                .content(Boolean.TRUE)
+                .build();
     }
 
     // 특정 게시글의 댓글 목록 조회 (계층구조)
@@ -198,7 +202,8 @@ public class CommentService {
         DailyfeedPage<CommentDto.Comment> updatedCommentPage = mergeAuthorDataRecursively(topLevelComments, httpResponse);
 
         return DailyfeedPageResponse.<CommentDto.Comment>builder()
-                .ok("Y").statusCode("200").reason("SUCCESS")
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
                 .content(updatedCommentPage)
                 .build();
     }
@@ -214,7 +219,8 @@ public class CommentService {
         DailyfeedPage<CommentDto.Comment> updatedCommentPage = mergeAuthorDataRecursively(comments, httpResponse);
 
         return DailyfeedPageResponse.<CommentDto.Comment>builder()
-                .ok("Y").statusCode("200").reason("SUCCESS")
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
                 .content(updatedCommentPage)
                 .build();
     }
@@ -235,7 +241,8 @@ public class CommentService {
         mergeAuthorData(commentList, httpResponse);
 
         return DailyfeedPageResponse.<CommentDto.Comment>builder()
-                .ok("Y").statusCode("200").reason("SUCCESS")
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
                 .content(pageMapper.fromJpaPageToDailyfeedPage(replies, commentList))
                 .build();
     }
@@ -249,7 +256,10 @@ public class CommentService {
         CommentDto.Comment commentDto = commentMapper.toComment(comment);
         mergeAuthorData(List.of(commentDto), httpResponse);
 
-        return DailyfeedServerResponse.<CommentDto.Comment>builder().ok("Y").statusCode("200").reason("OK").data(commentDto).build();
+        return DailyfeedServerResponse.<CommentDto.Comment>builder()
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
+                .content(commentDto).build();
     }
 
     // 나의 댓글
@@ -260,7 +270,8 @@ public class CommentService {
         Page<Comment> comments = commentRepository.findByAuthorIdAndNotDeleted(member.getId(), pageable);
 
         return DailyfeedPageResponse.<CommentDto.CommentSummary>builder()
-                .ok("Y").statusCode("200").reason("OK")
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
                 .content(mergeAuthorData(comments, httpResponse))
                 .build();
     }
@@ -272,7 +283,8 @@ public class CommentService {
         Page<Comment> comments = commentRepository.findByAuthorIdAndNotDeleted(userId, pageable);
 
         return DailyfeedPageResponse.<CommentDto.CommentSummary>builder()
-                .ok("Y").statusCode("200").reason("OK")
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
                 .content(mergeAuthorData(comments, httpResponse))
                 .build();
     }

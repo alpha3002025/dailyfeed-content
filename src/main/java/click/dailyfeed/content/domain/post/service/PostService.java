@@ -11,7 +11,8 @@ import click.dailyfeed.code.domain.member.member.dto.MemberProfileDto;
 import click.dailyfeed.code.domain.member.member.exception.MemberNotFoundException;
 import click.dailyfeed.code.global.kafka.exception.KafkaNetworkErrorException;
 import click.dailyfeed.code.global.kafka.type.DateBasedTopicType;
-import click.dailyfeed.code.global.web.response.DailyfeedPage;
+import click.dailyfeed.code.global.web.code.ResponseSuccessCode;
+import click.dailyfeed.code.global.web.page.DailyfeedPage;
 import click.dailyfeed.code.global.web.response.DailyfeedPageResponse;
 import click.dailyfeed.code.global.web.response.DailyfeedServerResponse;
 import click.dailyfeed.content.domain.kafka.KafkaHelper;
@@ -30,6 +31,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -58,7 +60,9 @@ public class PostService {
     public DailyfeedServerResponse<List<PostDto.Post>> getPostListByIdsIn(PostDto.PostsBulkRequest request, String token, HttpServletResponse httpResponse) {
         List<PostDto.Post> postList = postFeignHelper.getPostList(request, token, httpResponse);
         return DailyfeedServerResponse.<List<PostDto.Post>>builder()
-                .ok("Y").statusCode("200").reason("SUCCESS").data(postList)
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
+                .content(postList)
                 .build();
     }
 
@@ -80,10 +84,9 @@ public class PostService {
 
         // return
         return DailyfeedServerResponse.<PostDto.Post>builder()
-                .data(postMapper.toPostDto(post, memberSummary))
-                .ok("Y")
-                .statusCode("201")
-                .reason("SUCCESS")
+                .content(postMapper.toPostDto(post, memberSummary))
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
                 .build();
     }
 
@@ -116,10 +119,9 @@ public class PostService {
 
         // return
         return DailyfeedServerResponse.<PostDto.Post>builder()
-                .ok("Y")
-                .statusCode("200")
-                .reason("SUCCESS")
-                .data(postMapper.toPostDto(post, memberSummary))
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
+                .content(postMapper.toPostDto(post, memberSummary))
                 .build();
     }
 
@@ -180,10 +182,9 @@ public class PostService {
         deletePostDocument(post);
 
         return DailyfeedServerResponse.<Boolean>builder()
-                .ok("Y")
-                .statusCode("204")
-                .reason("SUCCESS")
-                .data(Boolean.TRUE)
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
+                .content(Boolean.TRUE)
                 .build();
     }
 
@@ -210,10 +211,9 @@ public class PostService {
         MemberDto.Member author = memberFeignHelper.getMemberById(post.getAuthorId(), token, response);
 
         return DailyfeedServerResponse.<PostDto.Post>builder()
-                .ok("Y")
-                .statusCode("200")
-                .reason("SUCCESS")
-                .data(postMapper.toPostDto(post, authorSummary))
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
+                .content(postMapper.toPostDto(post, authorSummary))
                 .build();
     }
 
@@ -227,7 +227,8 @@ public class PostService {
 
         DailyfeedPage<PostDto.Post> postDailyfeedPage = pageMapper.fromJpaPageToDailyfeedPage(posts, mergeAuthorAndCommentCount(posts.getContent(), httpResponse));
         return DailyfeedPageResponse.<PostDto.Post>builder()
-                .ok("Y").statusCode("200").reason("SUCCESS")
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
                 .content(postDailyfeedPage)
                 .build();
     }
@@ -243,10 +244,9 @@ public class PostService {
         post.incrementLikeCount();
 
         return DailyfeedServerResponse.<Boolean>builder()
-                .ok("Y")
-                .statusCode("200")
-                .reason("SUCCESS")
-                .data(Boolean.TRUE)
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
+                .content(Boolean.TRUE)
                 .build();
     }
 
@@ -261,10 +261,9 @@ public class PostService {
         post.decrementLikeCount();
 
         return DailyfeedServerResponse.<Boolean>builder()
-                .ok("Y")
-                .statusCode("200")
-                .reason("SUCCESS")
-                .data(Boolean.TRUE)
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
+                .content(Boolean.TRUE)
                 .build();
     }
 
@@ -280,7 +279,8 @@ public class PostService {
         DailyfeedPage<PostDto.Post> postDailyfeedPage = pageMapper.fromJpaPageToDailyfeedPage(posts, mergeAuthorAndCommentCount(posts.getContent(), httpResponse));
 
         return DailyfeedPageResponse.<PostDto.Post>builder()
-                .ok("Y").statusCode("200").reason("SUCCESS")
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
                 .content(postDailyfeedPage)
                 .build();
     }
@@ -295,7 +295,8 @@ public class PostService {
 
         DailyfeedPage<PostDto.Post> postDailyfeedPage = pageMapper.fromJpaPageToDailyfeedPage(posts, mergeAuthorAndCommentCount(posts.getContent(), httpResponse));
         return DailyfeedPageResponse.<PostDto.Post>builder()
-                .ok("Y").statusCode("200").reason("SUCCESS")
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
                 .content(postDailyfeedPage)
                 .build();
     }
@@ -310,7 +311,8 @@ public class PostService {
 
         DailyfeedPage<PostDto.Post> postDailyfeedPage = pageMapper.fromJpaPageToDailyfeedPage(posts, mergeAuthorAndCommentCount(posts.getContent(), httpResponse));
         return DailyfeedPageResponse.<PostDto.Post>builder()
-                .ok("Y").statusCode("200").reason("SUCCESS")
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
                 .content(postDailyfeedPage)
                 .build();
     }
@@ -325,7 +327,8 @@ public class PostService {
 
         DailyfeedPage<PostDto.Post> postDailyfeedPage = pageMapper.fromJpaPageToDailyfeedPage(posts, mergeAuthorAndCommentCount(posts.getContent(), httpResponse));
         return DailyfeedPageResponse.<PostDto.Post>builder()
-                .ok("Y").statusCode("200").reason("SUCCESS")
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
                 .content(postDailyfeedPage)
                 .build();
     }
@@ -340,7 +343,8 @@ public class PostService {
 
         DailyfeedPage<PostDto.Post> postDailyfeedPage = pageMapper.fromJpaPageToDailyfeedPage(posts, mergeAuthorAndCommentCount(posts.getContent(), httpResponse));
         return DailyfeedPageResponse.<PostDto.Post>builder()
-                .ok("Y").statusCode("200").reason("SUCCESS")
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
                 .content(postDailyfeedPage)
                 .build();
     }
@@ -371,7 +375,8 @@ public class PostService {
 
         DailyfeedPage<PostDto.Post> postDailyfeedPage = pageMapper.fromJpaPageToDailyfeedPage(posts, mergeAuthorAndCommentCount(posts.getContent(), httpResponse));
         return DailyfeedPageResponse.<PostDto.Post>builder()
-                .ok("Y").statusCode("200").reason("SUCCESS")
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
                 .content(postDailyfeedPage)
                 .build();
     }
