@@ -55,7 +55,6 @@ public class PostService {
     private final PostFeignHelper postFeignHelper;
     private final KafkaHelper kafkaHelper;
 
-    // TODO (작명 수정 필요) :: BULK REQUEST 네이밍 변경 필요  🫡
     // 특정 post id 리스트에 해당하는 post 리스트 조회
     public DailyfeedServerResponse<List<PostDto.Post>> getPostListByIdsIn(PostDto.PostsBulkRequest request, String token, HttpServletResponse httpResponse) {
         List<PostDto.Post> postList = postFeignHelper.getPostList(request, token, httpResponse);
