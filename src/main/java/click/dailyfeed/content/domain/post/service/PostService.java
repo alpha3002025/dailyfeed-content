@@ -16,7 +16,7 @@ import click.dailyfeed.code.global.web.code.ResponseSuccessCode;
 import click.dailyfeed.code.global.web.page.DailyfeedPage;
 import click.dailyfeed.code.global.web.response.DailyfeedPageResponse;
 import click.dailyfeed.code.global.web.response.DailyfeedServerResponse;
-import click.dailyfeed.content.config.redis.generator.DatePeriodBasedPageKeyGenerator;
+import click.dailyfeed.redis.config.redis.generator.DatePeriodBasedPageKeyGenerator;
 import click.dailyfeed.content.domain.kafka.KafkaHelper;
 import click.dailyfeed.content.domain.post.document.PostDocument;
 import click.dailyfeed.content.domain.post.entity.Post;

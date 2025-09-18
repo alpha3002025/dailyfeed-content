@@ -34,6 +34,7 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
         "click.dailyfeed.feign",
         "click.dailyfeed.content",
 		"click.dailyfeed.pagination",
+		"click.dailyfeed.redis",
 })
 public class ContentApplication {
 
