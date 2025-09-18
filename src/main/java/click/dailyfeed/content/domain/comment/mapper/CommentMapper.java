@@ -3,44 +3,80 @@ package click.dailyfeed.content.domain.comment.mapper;
 import click.dailyfeed.code.domain.content.comment.dto.CommentDto;
 import click.dailyfeed.code.domain.member.member.dto.MemberProfileDto;
 import click.dailyfeed.content.domain.comment.entity.Comment;
-import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
-import org.mapstruct.ReportingPolicy;
+import org.springframework.stereotype.Component;
 
-@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
-public interface CommentMapper {
-    @Mapping(target = "id", source = "comment.id")
-    @Mapping(target = "content", source = "comment.content")
-    @Mapping(target = "authorId", source = "comment.authorId")
-    @Mapping(target = "postId", source = "comment.post.id")
-    @Mapping(target = "parentId", source = "comment.parent.id")
-    @Mapping(target = "depth", source = "comment.depth")
-    @Mapping(target = "children", source = "comment.children")
-    @Mapping(target = "createdAt", source = "comment.createdAt")
-    @Mapping(target = "updatedAt", source = "comment.updatedAt")
-    CommentDto.Comment toComment(Comment comment);
+import java.util.ArrayList;
 
-    @Mapping(target = "id", source = "comment.id")
-    @Mapping(target = "content", source = "comment.content")
-    @Mapping(target = "authorId", source = "comment.authorId")
-    @Mapping(target = "authorName", source = "author.memberName")
-    @Mapping(target = "authorHandle", source = "author.memberHandle")
-    @Mapping(target = "postId", source = "comment.post.id")
-    @Mapping(target = "parentId", source = "comment.parent.id")
-    @Mapping(target = "depth", source = "comment.depth")
-    @Mapping(target = "children", source = "comment.children")
-    @Mapping(target = "createdAt", source = "comment.createdAt")
-    @Mapping(target = "updatedAt", source = "comment.updatedAt")
-    CommentDto.Comment toComment(Comment comment, MemberProfileDto.Summary author);
+@Component
+public class CommentMapper {
 
-    @Mapping(target = "id", source = "comment.id")
-    @Mapping(target = "content", source = "comment.content")
-    @Mapping(target = "authorId", source = "comment.authorId")
-    @Mapping(target = "postId", source = "comment.post.id")
-    @Mapping(target = "parentId", source = "comment.parent.id")
-    @Mapping(target = "depth", source = "comment.depth")
-    @Mapping(target = "likeCount", source = "comment.likeCount")
-    @Mapping(target = "childrenCount", expression = "java(comment.getChildren().size())")
-    @Mapping(target = "createdAt", source = "comment.createdAt")
-    CommentDto.CommentSummary toCommentSummary(Comment comment);
+    public CommentDto.Comment toCommentNonRecursive(Comment comment){
+        return CommentDto.Comment.builder()
+                .id(comment.getId())
+                .content(comment.getContent())
+                .authorId(comment.getAuthorId())
+                .postId(comment.getPost().getId())
+                .parentId(comment.getParent() != null ? comment.getParent().getId() : null)
+                .depth(comment.getDepth())
+                .children(comment.getChildren().stream()
+                        .map(this::toCommentNonRecursive)
+                        .toList())
+                .createdAt(comment.getCreatedAt())
+                .updatedAt(comment.getUpdatedAt())
+                .build();
+    }
+
+    // 순환 참조를 방지하기 위한 오버로드된 메서드
+    public CommentDto.Comment toCommentWith(Comment comment, boolean includeChildren) {
+        CommentDto.Comment.CommentBuilder builder = CommentDto.Comment.builder()
+                .id(comment.getId())
+                .content(comment.getContent())
+                .authorId(comment.getAuthorId())
+                .postId(comment.getPost().getId())
+                .parentId(comment.getParent() != null ? comment.getParent().getId() : null)
+                .depth(comment.getDepth())
+                .createdAt(comment.getCreatedAt())
+                .updatedAt(comment.getUpdatedAt());
+
+        if (includeChildren) {
+            builder.children(comment.getChildren().stream()
+                    .map(child -> toCommentWith(child, true))
+                    .toList());
+        } else {
+            builder.children(new ArrayList<>());
+        }
+
+        return builder.build();
+    }
+
+
+    public CommentDto.Comment toCommentNonRecursive(Comment comment, MemberProfileDto.Summary author){
+        return CommentDto.Comment.builder()
+                .id(comment.getId())
+                .content(comment.getContent())
+                .authorId(comment.getAuthorId())
+                .postId(comment.getPost().getId())
+                .parentId(comment.getParent() != null ? comment.getParent().getId() : null)
+                .depth(comment.getDepth())
+                .children(comment.getChildren().stream()
+                        .map(this::toCommentNonRecursive)
+                        .toList())
+                .createdAt(comment.getCreatedAt())
+                .updatedAt(comment.getUpdatedAt())
+                .build();
+    }
+
+    public CommentDto.CommentSummary toCommentSummary(Comment comment){
+        return CommentDto.CommentSummary.builder()
+                .id(comment.getId())
+                .content(comment.getContent())
+                .authorId(comment.getAuthorId())
+                .postId(comment.getPost().getId())
+                .parentId(comment.getParent() != null ? comment.getParent().getId() : null)
+                .depth(comment.getDepth())
+                .likeCount(comment.getLikeCount())
+                .childrenCount(comment.getChildren().size())
+                .createdAt(comment.getCreatedAt())
+                .build();
+    }
 }

@@ -97,7 +97,7 @@ public class CommentService {
         Comment savedComment = commentRepository.save(comment);
 
         // 응답 생성 및 작성자 정보 추가
-        CommentDto.Comment commentDto = commentMapper.toComment(savedComment, author);
+        CommentDto.Comment commentDto = commentMapper.toCommentNonRecursive(savedComment, author);
         mergeAuthorData(List.of(commentDto), httpResponse);
 
         // timeline 을 위한 활동 기록
@@ -144,7 +144,7 @@ public class CommentService {
 //        updateDocument(post);
 
         // 응답 생성 및 작성자 정보 추가
-        CommentDto.Comment commentUpdated = commentMapper.toComment(updatedComment, author);
+        CommentDto.Comment commentUpdated = commentMapper.toCommentNonRecursive(updatedComment, author);
         mergeAuthorData(List.of(commentUpdated), httpResponse);
 
         return DailyfeedServerResponse.<CommentDto.Comment>builder()
@@ -235,7 +235,7 @@ public class CommentService {
         Page<Comment> replies = commentRepository.findChildrenByParentWithPaging(parentComment, pageable);
 
         List<CommentDto.Comment> commentList = replies.getContent().stream()
-                .map(commentMapper::toComment)
+                .map(commentMapper::toCommentNonRecursive)
                 .collect(Collectors.toList());
 
         mergeAuthorData(commentList, httpResponse);
@@ -253,7 +253,7 @@ public class CommentService {
         Comment comment = commentRepository.findByIdAndNotDeleted(commentId)
                 .orElseThrow(CommentNotFoundException::new);
 
-        CommentDto.Comment commentDto = commentMapper.toComment(comment);
+        CommentDto.Comment commentDto = commentMapper.toCommentNonRecursive(comment);
         mergeAuthorData(List.of(commentDto), httpResponse);
 
         return DailyfeedServerResponse.<CommentDto.Comment>builder()
@@ -314,7 +314,7 @@ public class CommentService {
     private DailyfeedPage<CommentDto.Comment> mergeAuthorDataRecursively(Page<Comment> commentsPage, HttpServletResponse httpResponse) {
         if(commentsPage.isEmpty()) return pageMapper.emptyPage();
 
-        List<CommentDto.Comment> commentList = commentsPage.getContent().stream().map(commentMapper::toComment).collect(Collectors.toList());
+        List<CommentDto.Comment> commentList = commentsPage.getContent().stream().map(commentMapper::toCommentNonRecursive).collect(Collectors.toList());
 
         Set<Long> authorIds = commentList.stream()
                 .map(CommentDto.Comment::getAuthorId)
