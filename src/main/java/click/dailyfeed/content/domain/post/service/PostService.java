@@ -85,7 +85,7 @@ public class PostService {
         // return
         return DailyfeedServerResponse.<PostDto.Post>builder()
                 .content(postMapper.toPostDto(post, memberSummary))
-                .status(HttpStatus.OK.value())
+                .status(HttpStatus.CREATED.value())
                 .result(ResponseSuccessCode.SUCCESS)
                 .build();
     }
