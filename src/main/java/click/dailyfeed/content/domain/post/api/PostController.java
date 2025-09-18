@@ -81,7 +81,7 @@ public class PostController {
             @RequestHeader(value = "Authorization", required = false) String token,
             HttpServletResponse httpResponse,
             @PathVariable Long postId) {
-        return postService.getPost(member, postId, token, httpResponse);
+        return postService.getPostById(member, postId, token, httpResponse);
     }
 
     // 게시글 좋아요 증가
@@ -108,13 +108,14 @@ public class PostController {
             @AuthenticatedMember MemberDto.Member member,
             HttpServletResponse httpResponse,
             @RequestHeader("Authorization") String token,
+            @PathVariable Long authorId,
             @PageableDefault(
                     page = 0,
                     size = 10,
                     sort = "createdAt",
                     direction = Sort.Direction.DESC
             ) Pageable pageable) {
-        return postService.getPostsByAuthor(token, pageable, httpResponse);
+        return postService.getPostsByAuthor(authorId, token, pageable, httpResponse);
     }
 
     // 특정 기간 내 게시글 조회
