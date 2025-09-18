@@ -2,6 +2,7 @@ package click.dailyfeed.content.domain.comment.api;
 
 import click.dailyfeed.code.domain.content.comment.dto.CommentDto;
 import click.dailyfeed.code.domain.member.member.dto.MemberDto;
+import click.dailyfeed.code.global.web.code.ResponseSuccessCode;
 import click.dailyfeed.code.global.web.response.DailyfeedPageResponse;
 import click.dailyfeed.code.global.web.response.DailyfeedServerResponse;
 import click.dailyfeed.content.domain.comment.service.CommentService;
@@ -13,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 @Slf4j
@@ -132,7 +134,11 @@ public class CommentController {
             @AuthenticatedMember MemberDto.Member member
     ) {
         commentService.incrementLikeCount(member, commentId);
-        return DailyfeedServerResponse.<Boolean>builder().ok("Y").statusCode("201").reason("LIKE_CREATED").data(Boolean.TRUE).build();
+        return DailyfeedServerResponse.<Boolean>builder()
+                .status(HttpStatus.CREATED.value())
+                .result(ResponseSuccessCode.SUCCESS)
+                .content(Boolean.TRUE)
+                .build();
     }
 
     // 댓글 좋아요 취소
@@ -142,7 +148,11 @@ public class CommentController {
             @AuthenticatedMember MemberDto.Member member
     ) {
         commentService.decrementLikeCount(member, commentId);
-        return DailyfeedServerResponse.<Boolean>builder().ok("Y").statusCode("204").reason("LIKE_DELETED").data(Boolean.TRUE).build();
+        return DailyfeedServerResponse.<Boolean>builder()
+                .status(HttpStatus.NO_CONTENT.value())
+                .result(ResponseSuccessCode.SUCCESS)
+                .content(Boolean.TRUE)
+                .build();
     }
 
 }
