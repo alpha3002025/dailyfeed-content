@@ -2,6 +2,8 @@ package click.dailyfeed.content.domain.post.api;
 
 import click.dailyfeed.code.domain.content.post.dto.PostDto;
 import click.dailyfeed.code.domain.member.member.dto.MemberDto;
+import click.dailyfeed.code.global.web.code.ResponseSuccessCode;
+import click.dailyfeed.code.global.web.page.DailyfeedPage;
 import click.dailyfeed.code.global.web.response.DailyfeedPageResponse;
 import click.dailyfeed.code.global.web.response.DailyfeedServerResponse;
 import click.dailyfeed.content.domain.post.service.PostService;
@@ -15,6 +17,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -36,7 +39,13 @@ public class PostController {
             HttpServletResponse httpResponse,
             PostDto.PostsBulkRequest request
     ){
-        return postService.getPostListByIdsIn(request, token, httpResponse);
+
+        List<PostDto.Post> result = postService.getPostListByIdsIn(request, token, httpResponse);
+        return DailyfeedServerResponse.<List<PostDto.Post>>builder()
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
+                .content(result)
+                .build();
     }
 
     // 게시글 작성
@@ -48,7 +57,12 @@ public class PostController {
             @RequestHeader(value = "Authorization", required = false) String token,
             HttpServletResponse response ) {
 
-        return postService.createPost(member, request, token, response);
+        PostDto.Post result = postService.createPost(member, request, token, response);
+        return DailyfeedServerResponse.<PostDto.Post>builder()
+                .content(result)
+                .status(HttpStatus.CREATED.value())
+                .result(ResponseSuccessCode.SUCCESS)
+                .build();
     }
 
     // 게시글 수정
@@ -60,7 +74,13 @@ public class PostController {
             HttpServletResponse httpResponse,
             @PathVariable Long postId,
             @Valid @RequestBody PostDto.UpdatePostRequest updateRequest ) {
-        return postService.updatePost(member, postId, updateRequest, token, httpResponse);
+
+        PostDto.Post result = postService.updatePost(member, postId, updateRequest, token, httpResponse);
+        return DailyfeedServerResponse.<PostDto.Post>builder()
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
+                .content(result)
+                .build();
     }
 
     // 게시글 삭제
@@ -70,7 +90,12 @@ public class PostController {
             @AuthenticatedMember MemberDto.Member member,
             HttpServletResponse httpResponse,
             @PathVariable Long postId ) {
-        return postService.deletePost(member, postId, httpResponse);
+        Boolean result = postService.deletePost(member, postId, httpResponse);
+        return DailyfeedServerResponse.<Boolean>builder()
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
+                .content(result)
+                .build();
     }
 
     // 게시글 상세 조회
@@ -81,7 +106,13 @@ public class PostController {
             @RequestHeader(value = "Authorization", required = false) String token,
             HttpServletResponse httpResponse,
             @PathVariable Long postId) {
-        return postService.getPostById(member, postId, token, httpResponse);
+
+        PostDto.Post result = postService.getPostById(member, postId, token, httpResponse);
+        return DailyfeedServerResponse.<PostDto.Post>builder()
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
+                .content(result)
+                .build();
     }
 
     // 게시글 좋아요 증가
@@ -90,7 +121,13 @@ public class PostController {
             @AuthenticatedMember MemberDto.Member member,
             @PathVariable Long postId
     ) {
-        return postService.incrementLikeCount(postId);
+
+        Boolean result = postService.incrementLikeCount(postId);
+        return DailyfeedServerResponse.<Boolean>builder()
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
+                .content(result)
+                .build();
     }
 
     // 게시글 좋아요 감소
@@ -98,7 +135,13 @@ public class PostController {
     public DailyfeedServerResponse<Boolean> decrementLikeCount(
             @AuthenticatedMember MemberDto.Member member,
             @PathVariable Long postId) {
-        return postService.decrementLikeCount(postId);
+
+        Boolean result = postService.decrementLikeCount(postId);
+        return DailyfeedServerResponse.<Boolean>builder()
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
+                .content(result)
+                .build();
     }
 
     // 작성자별 게시글 목록 조회
@@ -115,11 +158,17 @@ public class PostController {
                     sort = "createdAt",
                     direction = Sort.Direction.DESC
             ) Pageable pageable) {
-        return postService.getPostsByAuthor(authorId, token, pageable, httpResponse);
+
+        DailyfeedPage<PostDto.Post> result = postService.getPostsByAuthor(authorId, token, pageable, httpResponse);
+        return DailyfeedPageResponse.<PostDto.Post>builder()
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
+                .content(result)
+                .build();
     }
 
+    // TODO : timeline-svc 으로 이관
     // 특정 기간 내 게시글 조회
-    // (timeline 으로 이관 예정(/timeline/feed/search/period))
     @GetMapping("/date-range")
     public DailyfeedPageResponse<PostDto.Post> getPostsByDateRange(
             HttpServletResponse httpResponse,
@@ -127,7 +176,13 @@ public class PostController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return postService.getPostsByDateRange(startDate, endDate, page, size, httpResponse);
+
+        DailyfeedPage<PostDto.Post> result = postService.getPostsByDateRange(startDate, endDate, page, size, httpResponse);
+        return DailyfeedPageResponse.<PostDto.Post>builder()
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
+                .content(result)
+                .build();
     }
 
     // 댓글이 많은 게시글 조회
@@ -137,7 +192,13 @@ public class PostController {
             HttpServletResponse httpResponse,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return postService.getPostsOrderByCommentCount(page, size, httpResponse);
+
+        DailyfeedPage<PostDto.Post> result = postService.getPostsOrderByCommentCount(page, size, httpResponse);
+        return DailyfeedPageResponse.<PostDto.Post>builder()
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
+                .content(result)
+                .build();
     }
 
     // 인기 게시글 조회
@@ -147,7 +208,13 @@ public class PostController {
             HttpServletResponse httpResponse,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return postService.getPopularPosts(page, size, httpResponse);
+
+        DailyfeedPage<PostDto.Post> result = postService.getPopularPosts(page, size, httpResponse);
+        return DailyfeedPageResponse.<PostDto.Post>builder()
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
+                .content(result)
+                .build();
     }
 
     // 최근 활동이 있는 게시글 조회
@@ -157,7 +224,13 @@ public class PostController {
             HttpServletResponse httpResponse,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return postService.getPostsByRecentActivity(page, size, httpResponse);
+
+        DailyfeedPage<PostDto.Post> result = postService.getPostsByRecentActivity(page, size, httpResponse);
+        return DailyfeedPageResponse.<PostDto.Post>builder()
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
+                .content(result)
+                .build();
     }
 
     // 게시글 검색
@@ -169,8 +242,11 @@ public class PostController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        log.info("Searching posts with keyword: {}", keyword);
-
-        return postService.searchPosts(keyword, page, size, httpResponse);
+        DailyfeedPage<PostDto.Post> result = postService.searchPosts(keyword, page, size, httpResponse);
+        return DailyfeedPageResponse.<PostDto.Post>builder()
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
+                .content(result)
+                .build();
     }
 }
