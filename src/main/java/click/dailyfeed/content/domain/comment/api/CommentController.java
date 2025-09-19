@@ -3,6 +3,7 @@ package click.dailyfeed.content.domain.comment.api;
 import click.dailyfeed.code.domain.content.comment.dto.CommentDto;
 import click.dailyfeed.code.domain.member.member.dto.MemberDto;
 import click.dailyfeed.code.global.web.code.ResponseSuccessCode;
+import click.dailyfeed.code.global.web.page.DailyfeedPage;
 import click.dailyfeed.code.global.web.response.DailyfeedPageResponse;
 import click.dailyfeed.code.global.web.response.DailyfeedServerResponse;
 import click.dailyfeed.content.domain.comment.service.CommentService;
@@ -32,7 +33,12 @@ public class CommentController {
             @RequestHeader("Authorization") String authorizationHeader,
             HttpServletResponse httpResponse,
             @Valid @RequestBody CommentDto.CreateCommentRequest request) {
-        return commentService.createComment(member, authorizationHeader, request, httpResponse);
+        CommentDto.Comment result = commentService.createComment(member, authorizationHeader, request, httpResponse);
+        return DailyfeedServerResponse.<CommentDto.Comment>builder()
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
+                .content(result)
+                .build();
     }
 
     // 내 댓글 목록
@@ -42,7 +48,12 @@ public class CommentController {
             @RequestHeader("Authorization") String authorizationHeader,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return commentService.getMyComments(authorizationHeader, page, size, httpResponse);
+        DailyfeedPage<CommentDto.CommentSummary> result = commentService.getMyComments(authorizationHeader, page, size, httpResponse);
+        return DailyfeedPageResponse.<CommentDto.CommentSummary>builder()
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
+                .content(result)
+                .build();
     }
 
     ///  /comments/post/{postId}    ///
@@ -62,7 +73,13 @@ public class CommentController {
             ) Pageable pageable,
             @PathVariable Long postId
     ) {
-        return commentService.getCommentsByPost(postId, pageable, httpResponse);
+
+        DailyfeedPage<CommentDto.Comment> result = commentService.getCommentsByPost(postId, pageable, httpResponse);
+        return DailyfeedPageResponse.<CommentDto.Comment>builder()
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
+                .content(result)
+                .build();
     }
 
     // 특정 게시글의 댓글 목록을 페이징으로 조회
@@ -72,7 +89,13 @@ public class CommentController {
             @PathVariable Long postId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return commentService.getCommentsByPostWithPaging(postId, page, size, httpResponse);
+
+        DailyfeedPage<CommentDto.Comment> result = commentService.getCommentsByPostWithPaging(postId, page, size, httpResponse);
+        return DailyfeedPageResponse.<CommentDto.Comment>builder()
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
+                .content(result)
+                .build();
     }
 
     /// /comments/member/{memberId}     ///
@@ -83,7 +106,13 @@ public class CommentController {
             @PathVariable Long memberId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return commentService.getCommentsByUser(memberId, page, size, httpResponse);
+
+        DailyfeedPage<CommentDto.CommentSummary> result = commentService.getCommentsByUser(memberId, page, size, httpResponse);
+        return DailyfeedPageResponse.<CommentDto.CommentSummary>builder()
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
+                .content(result)
+                .build();
     }
 
     /// /comments/{commentId}   ///
@@ -95,7 +124,13 @@ public class CommentController {
             HttpServletResponse httpResponse,
             @PathVariable Long commentId,
             @Valid @RequestBody CommentDto.UpdateCommentRequest request) {
-        return commentService.updateComment(member, commentId, request, authorizationHeader, httpResponse);
+
+        CommentDto.Comment result = commentService.updateComment(member, commentId, request, authorizationHeader, httpResponse);
+        return DailyfeedServerResponse.<CommentDto.Comment>builder()
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
+                .content(result)
+                .build();
     }
 
     // 댓글 삭제
@@ -106,7 +141,13 @@ public class CommentController {
             @RequestHeader("Authorization") String authorizationHeader,
             HttpServletResponse httpResponse
     ) {
-        return commentService.deleteComment(member, commentId, authorizationHeader, httpResponse);
+
+        Boolean result = commentService.deleteComment(member, commentId, authorizationHeader, httpResponse);
+        return DailyfeedServerResponse.<Boolean>builder()
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
+                .content(result)
+                .build();
     }
 
     // 댓글 상세 조회
@@ -114,7 +155,13 @@ public class CommentController {
     public DailyfeedServerResponse<CommentDto.Comment> getComment(
             HttpServletResponse httpResponse,
             @PathVariable Long commentId) {
-        return commentService.getComment(commentId, httpResponse);
+
+        CommentDto.Comment result = commentService.getComment(commentId, httpResponse);
+        return DailyfeedServerResponse.<CommentDto.Comment>builder()
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
+                .content(result)
+                .build();
     }
 
     // 대댓글 목록 조회
@@ -124,7 +171,13 @@ public class CommentController {
             @PathVariable Long commentId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        return commentService.getRepliesByParent(commentId, page, size, httpResponse);
+
+        DailyfeedPage<CommentDto.Comment> result = commentService.getRepliesByParent(commentId, page, size, httpResponse);
+        return DailyfeedPageResponse.<CommentDto.Comment>builder()
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
+                .content(result)
+                .build();
     }
 
     // 댓글 좋아요

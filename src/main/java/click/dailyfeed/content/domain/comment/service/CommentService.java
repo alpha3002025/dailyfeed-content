@@ -10,10 +10,7 @@ import click.dailyfeed.code.domain.member.member.dto.MemberProfileDto;
 import click.dailyfeed.code.domain.member.member.exception.MemberException;
 import click.dailyfeed.code.global.kafka.exception.KafkaNetworkErrorException;
 import click.dailyfeed.code.global.kafka.type.DateBasedTopicType;
-import click.dailyfeed.code.global.web.code.ResponseSuccessCode;
 import click.dailyfeed.code.global.web.page.DailyfeedPage;
-import click.dailyfeed.code.global.web.response.DailyfeedPageResponse;
-import click.dailyfeed.code.global.web.response.DailyfeedServerResponse;
 import click.dailyfeed.content.domain.comment.document.CommentDocument;
 import click.dailyfeed.content.domain.comment.entity.Comment;
 import click.dailyfeed.content.domain.comment.mapper.CommentEventMapper;
@@ -31,7 +28,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -58,7 +54,7 @@ public class CommentService {
     private static final int MAX_COMMENT_DEPTH = 2; // 최대 댓글 깊이 제한
 
     // 댓글 작성
-    public DailyfeedServerResponse<CommentDto.Comment> createComment(MemberDto.Member member, String token, CommentDto.CreateCommentRequest request, HttpServletResponse httpResponse) {
+    public CommentDto.Comment createComment(MemberDto.Member member, String token, CommentDto.CreateCommentRequest request, HttpServletResponse httpResponse) {
         MemberProfileDto.Summary author = memberFeignHelper.getMemberSummaryById(member.getId(), token, httpResponse);
         Long authorId = author.getId();
 
@@ -109,11 +105,7 @@ public class CommentService {
         // mongodb 에 본문 저장 (Season2 개발 예정) (TODO)
         insertNewDocument(post, savedComment);
 
-        return DailyfeedServerResponse.<CommentDto.Comment>builder()
-                .status(HttpStatus.OK.value())
-                .result(ResponseSuccessCode.SUCCESS)
-                .content(commentDto)
-                .build();
+        return commentDto;
     }
 
     public void insertNewDocument(Post post, Comment comment){
@@ -123,7 +115,7 @@ public class CommentService {
     }
 
     // 댓글 수정
-    public DailyfeedServerResponse<CommentDto.Comment> updateComment(MemberDto.Member member, Long commentId, CommentDto.UpdateCommentRequest request, String token, HttpServletResponse httpResponse) {
+    public CommentDto.Comment updateComment(MemberDto.Member member, Long commentId, CommentDto.UpdateCommentRequest request, String token, HttpServletResponse httpResponse) {
         MemberProfileDto.Summary author = memberFeignHelper.getMemberSummaryById(member.getId(), token, httpResponse);
         Long authorId = author.getId();
 
@@ -149,11 +141,7 @@ public class CommentService {
         CommentDto.Comment commentUpdated = commentMapper.toCommentNonRecursive(updatedComment, author);
         mergeAuthorData(List.of(commentUpdated), httpResponse);
 
-        return DailyfeedServerResponse.<CommentDto.Comment>builder()
-                .status(HttpStatus.OK.value())
-                .result(ResponseSuccessCode.SUCCESS)
-                .content(commentUpdated)
-                .build();
+        return commentUpdated;
     }
 
     // 본문 검색 용도의 컬렉션 'comments' 에 저장
@@ -169,7 +157,7 @@ public class CommentService {
     }
 
     // 댓글 삭제 (소프트 삭제)
-    public DailyfeedServerResponse<Boolean> deleteComment(MemberDto.Member requestedMember, Long commentId, String token, HttpServletResponse httpResponse) {
+    public Boolean deleteComment(MemberDto.Member requestedMember, Long commentId, String token, HttpServletResponse httpResponse) {
         Long authorId = requestedMember.getId();
 
         Comment comment = commentRepository.findByIdAndNotDeleted(commentId)
@@ -186,50 +174,34 @@ public class CommentService {
         // timeline 을 위한 활동 기록
         publishCommentActivity(requestedMember.getId(), commentId, CommentActivityType.SOFT_DELETE);
 
-        return DailyfeedServerResponse.<Boolean>builder()
-                .status(HttpStatus.OK.value())
-                .result(ResponseSuccessCode.SUCCESS)
-                .content(Boolean.TRUE)
-                .build();
+        return Boolean.TRUE;
     }
 
     // 특정 게시글의 댓글 목록 조회 (계층구조)
     @Transactional(readOnly = true)
-    public DailyfeedPageResponse<CommentDto.Comment> getCommentsByPost(Long postId, Pageable pageable, HttpServletResponse httpResponse) {
+    public DailyfeedPage<CommentDto.Comment> getCommentsByPost(Long postId, Pageable pageable, HttpServletResponse httpResponse) {
         Post post = getPostByIdOrThrow(postId);
 
         Page<Comment> topLevelComments = commentRepository.findCommentsByPost(post, pageable);
 
         // 모든 댓글(자식 포함)의 작성자 정보 추가
-        DailyfeedPage<CommentDto.Comment> updatedCommentPage = mergeAuthorDataRecursively(topLevelComments, httpResponse);
-
-        return DailyfeedPageResponse.<CommentDto.Comment>builder()
-                .status(HttpStatus.OK.value())
-                .result(ResponseSuccessCode.SUCCESS)
-                .content(updatedCommentPage)
-                .build();
+         return mergeAuthorDataRecursively(topLevelComments, httpResponse);
     }
 
     // 특정 게시글의 댓글 목록을 페이징으로 조회
     @Transactional(readOnly = true)
-    public DailyfeedPageResponse<CommentDto.Comment> getCommentsByPostWithPaging(Long postId, int page, int size, HttpServletResponse httpResponse) {
+    public DailyfeedPage<CommentDto.Comment> getCommentsByPostWithPaging(Long postId, int page, int size, HttpServletResponse httpResponse) {
         Post post = getPostByIdOrThrow(postId);
 
         Pageable pageable = PageRequest.of(page, size);
         Page<Comment> comments = commentRepository.findTopLevelCommentsByPostWithPaging(post, pageable);
 
-        DailyfeedPage<CommentDto.Comment> updatedCommentPage = mergeAuthorDataRecursively(comments, httpResponse);
-
-        return DailyfeedPageResponse.<CommentDto.Comment>builder()
-                .status(HttpStatus.OK.value())
-                .result(ResponseSuccessCode.SUCCESS)
-                .content(updatedCommentPage)
-                .build();
+        return mergeAuthorDataRecursively(comments, httpResponse);
     }
 
     // 대댓글 목록 조회
     @Transactional(readOnly = true)
-    public DailyfeedPageResponse<CommentDto.Comment> getRepliesByParent(Long parentId, int page, int size, HttpServletResponse httpResponse) {
+    public DailyfeedPage<CommentDto.Comment> getRepliesByParent(Long parentId, int page, int size, HttpServletResponse httpResponse) {
         Comment parentComment = commentRepository.findByIdAndNotDeleted(parentId)
                 .orElseThrow(ParentCommentNotFoundException::new);
 
@@ -242,53 +214,38 @@ public class CommentService {
 
         mergeAuthorData(commentList, httpResponse);
 
-        return DailyfeedPageResponse.<CommentDto.Comment>builder()
-                .status(HttpStatus.OK.value())
-                .result(ResponseSuccessCode.SUCCESS)
-                .content(pageMapper.fromJpaPageToDailyfeedPage(replies, commentList))
-                .build();
+        return pageMapper.fromJpaPageToDailyfeedPage(replies, commentList);
     }
 
     // 댓글 상세 조회
     @Transactional(readOnly = true)
-    public DailyfeedServerResponse<CommentDto.Comment> getComment(Long commentId, HttpServletResponse httpResponse) {
+    public CommentDto.Comment getComment(Long commentId, HttpServletResponse httpResponse) {
         Comment comment = commentRepository.findByIdAndNotDeleted(commentId)
                 .orElseThrow(CommentNotFoundException::new);
 
         CommentDto.Comment commentDto = commentMapper.toCommentNonRecursive(comment);
         mergeAuthorData(List.of(commentDto), httpResponse);
-
-        return DailyfeedServerResponse.<CommentDto.Comment>builder()
-                .status(HttpStatus.OK.value())
-                .result(ResponseSuccessCode.SUCCESS)
-                .content(commentDto).build();
+        return commentDto;
     }
 
     // 나의 댓글
     @Transactional(readOnly = true)
-    public DailyfeedPageResponse<CommentDto.CommentSummary> getMyComments(String token, int page, int size, HttpServletResponse httpResponse) {
+    public DailyfeedPage<CommentDto.CommentSummary> getMyComments(String token, int page, int size, HttpServletResponse httpResponse) {
         MemberDto.Member member = memberFeignHelper.getMember(token, httpResponse);
+
         Pageable pageable = PageRequest.of(page, size);
         Page<Comment> comments = commentRepository.findByAuthorIdAndNotDeleted(member.getId(), pageable);
 
-        return DailyfeedPageResponse.<CommentDto.CommentSummary>builder()
-                .status(HttpStatus.OK.value())
-                .result(ResponseSuccessCode.SUCCESS)
-                .content(mergeAuthorData(comments, httpResponse))
-                .build();
+        return mergeAuthorData(comments, httpResponse);
     }
 
     // 특정 사용자의 댓글 목록
     @Transactional(readOnly = true)
-    public DailyfeedPageResponse<CommentDto.CommentSummary> getCommentsByUser(Long userId, int page, int size, HttpServletResponse httpResponse) {
+    public DailyfeedPage<CommentDto.CommentSummary> getCommentsByUser(Long userId, int page, int size, HttpServletResponse httpResponse) {
         Pageable pageable = PageRequest.of(page, size);
         Page<Comment> comments = commentRepository.findByAuthorIdAndNotDeleted(userId, pageable);
 
-        return DailyfeedPageResponse.<CommentDto.CommentSummary>builder()
-                .status(HttpStatus.OK.value())
-                .result(ResponseSuccessCode.SUCCESS)
-                .content(mergeAuthorData(comments, httpResponse))
-                .build();
+        return mergeAuthorData(comments, httpResponse);
     }
 
     public DailyfeedPage<CommentDto.CommentSummary> mergeAuthorData(Page<Comment> commentsPage, HttpServletResponse httpResponse) {
