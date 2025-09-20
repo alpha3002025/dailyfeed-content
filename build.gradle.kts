@@ -47,6 +47,7 @@ allprojects {
         implementation(project(":dailyfeed-feign"))
         implementation(project(":dailyfeed-pagination-support"))
         implementation(project(":dailyfeed-redis-support"))
+        implementation(project(":dailyfeed-kafka-support"))
 
         // spring
         implementation("org.springframework.boot:spring-boot-starter-data-jpa")

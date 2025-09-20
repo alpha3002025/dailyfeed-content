@@ -13,7 +13,6 @@ import click.dailyfeed.code.global.cache.RedisKeyConstant;
 import click.dailyfeed.code.global.kafka.exception.KafkaNetworkErrorException;
 import click.dailyfeed.code.global.kafka.type.DateBasedTopicType;
 import click.dailyfeed.code.global.web.page.DailyfeedPage;
-import click.dailyfeed.content.domain.kafka.KafkaHelper;
 import click.dailyfeed.content.domain.post.document.PostDocument;
 import click.dailyfeed.content.domain.post.entity.Post;
 import click.dailyfeed.content.domain.post.mapper.PostEventMapper;
@@ -22,6 +21,7 @@ import click.dailyfeed.content.domain.post.repository.jpa.PostRepository;
 import click.dailyfeed.content.domain.post.repository.mongo.PostMongoRepository;
 import click.dailyfeed.feign.domain.member.MemberFeignHelper;
 import click.dailyfeed.feign.domain.post.PostFeignHelper;
+import click.dailyfeed.kafka.domain.kafka.service.KafkaHelper;
 import click.dailyfeed.pagination.mapper.PageMapper;
 import click.dailyfeed.redis.config.redis.generator.DatePeriodBasedPageKeyGenerator;
 import jakarta.servlet.http.HttpServletResponse;
@@ -117,7 +117,7 @@ public class PostService {
                 .findByPostPkAndIsDeletedAndIsCurrent(post.getId(), Boolean.FALSE, Boolean.TRUE)
                 .orElseThrow(PostNotFoundException::new);
 
-//        oldDocument.markAsDeleted(Boolean.FALSE);
+        oldDocument.softDelete();
         PostDocument updatedPost = PostDocument.newUpdatedPost(oldDocument, post.getUpdatedAt());
 
         postMongoRepository.save(updatedPost);
