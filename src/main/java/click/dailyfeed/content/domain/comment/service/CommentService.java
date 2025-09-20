@@ -104,7 +104,7 @@ public class CommentService {
         // timeline 을 위한 활동 기록
         publishCommentActivity(member.getId(), savedComment.getId(), CommentActivityType.CREATE);
 
-        // mongodb 에 본문 저장 (Season2 개발 예정) (TODO)
+        // mongodb 에 본문 저장 (Season2 개발 예정)
         insertNewDocument(post, savedComment);
 
         return commentDto;
