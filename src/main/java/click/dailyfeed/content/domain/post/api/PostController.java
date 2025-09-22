@@ -44,7 +44,7 @@ public class PostController {
         return DailyfeedServerResponse.<List<PostDto.Post>>builder()
                 .status(HttpStatus.OK.value())
                 .result(ResponseSuccessCode.SUCCESS)
-                .content(result)
+                .data(result)
                 .build();
     }
 
@@ -59,7 +59,7 @@ public class PostController {
 
         PostDto.Post result = postService.createPost(member, request, token, response);
         return DailyfeedServerResponse.<PostDto.Post>builder()
-                .content(result)
+                .data(result)
                 .status(HttpStatus.CREATED.value())
                 .result(ResponseSuccessCode.SUCCESS)
                 .build();
@@ -79,7 +79,7 @@ public class PostController {
         return DailyfeedServerResponse.<PostDto.Post>builder()
                 .status(HttpStatus.OK.value())
                 .result(ResponseSuccessCode.SUCCESS)
-                .content(result)
+                .data(result)
                 .build();
     }
 
@@ -94,7 +94,7 @@ public class PostController {
         return DailyfeedServerResponse.<Boolean>builder()
                 .status(HttpStatus.OK.value())
                 .result(ResponseSuccessCode.SUCCESS)
-                .content(result)
+                .data(result)
                 .build();
     }
 
@@ -111,7 +111,7 @@ public class PostController {
         return DailyfeedServerResponse.<PostDto.Post>builder()
                 .status(HttpStatus.OK.value())
                 .result(ResponseSuccessCode.SUCCESS)
-                .content(result)
+                .data(result)
                 .build();
     }
 
@@ -126,7 +126,7 @@ public class PostController {
         return DailyfeedServerResponse.<Boolean>builder()
                 .status(HttpStatus.OK.value())
                 .result(ResponseSuccessCode.SUCCESS)
-                .content(result)
+                .data(result)
                 .build();
     }
 
@@ -140,7 +140,7 @@ public class PostController {
         return DailyfeedServerResponse.<Boolean>builder()
                 .status(HttpStatus.OK.value())
                 .result(ResponseSuccessCode.SUCCESS)
-                .content(result)
+                .data(result)
                 .build();
     }
 
@@ -163,7 +163,7 @@ public class PostController {
         return DailyfeedPageResponse.<PostDto.Post>builder()
                 .status(HttpStatus.OK.value())
                 .result(ResponseSuccessCode.SUCCESS)
-                .content(result)
+                .data(result)
                 .build();
     }
 
@@ -181,7 +181,7 @@ public class PostController {
         return DailyfeedPageResponse.<PostDto.Post>builder()
                 .status(HttpStatus.OK.value())
                 .result(ResponseSuccessCode.SUCCESS)
-                .content(result)
+                .data(result)
                 .build();
     }
 
@@ -197,7 +197,7 @@ public class PostController {
         return DailyfeedPageResponse.<PostDto.Post>builder()
                 .status(HttpStatus.OK.value())
                 .result(ResponseSuccessCode.SUCCESS)
-                .content(result)
+                .data(result)
                 .build();
     }
 
@@ -213,7 +213,7 @@ public class PostController {
         return DailyfeedPageResponse.<PostDto.Post>builder()
                 .status(HttpStatus.OK.value())
                 .result(ResponseSuccessCode.SUCCESS)
-                .content(result)
+                .data(result)
                 .build();
     }
 
@@ -229,7 +229,7 @@ public class PostController {
         return DailyfeedPageResponse.<PostDto.Post>builder()
                 .status(HttpStatus.OK.value())
                 .result(ResponseSuccessCode.SUCCESS)
-                .content(result)
+                .data(result)
                 .build();
     }
 
@@ -246,7 +246,7 @@ public class PostController {
         return DailyfeedPageResponse.<PostDto.Post>builder()
                 .status(HttpStatus.OK.value())
                 .result(ResponseSuccessCode.SUCCESS)
-                .content(result)
+                .data(result)
                 .build();
     }
 }

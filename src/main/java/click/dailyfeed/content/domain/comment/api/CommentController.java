@@ -34,7 +34,7 @@ public class CommentController {
         return DailyfeedServerResponse.<CommentDto.Comment>builder()
                 .status(HttpStatus.OK.value())
                 .result(ResponseSuccessCode.SUCCESS)
-                .content(result)
+                .data(result)
                 .build();
     }
 
@@ -49,7 +49,7 @@ public class CommentController {
         return DailyfeedPageResponse.<CommentDto.CommentSummary>builder()
                 .status(HttpStatus.OK.value())
                 .result(ResponseSuccessCode.SUCCESS)
-                .content(result)
+                .data(result)
                 .build();
     }
 
@@ -70,7 +70,7 @@ public class CommentController {
         return DailyfeedPageResponse.<CommentDto.Comment>builder()
                 .status(HttpStatus.OK.value())
                 .result(ResponseSuccessCode.SUCCESS)
-                .content(result)
+                .data(result)
                 .build();
     }
 
@@ -87,7 +87,7 @@ public class CommentController {
         return DailyfeedPageResponse.<CommentDto.CommentSummary>builder()
                 .status(HttpStatus.OK.value())
                 .result(ResponseSuccessCode.SUCCESS)
-                .content(result)
+                .data(result)
                 .build();
     }
 
@@ -105,7 +105,7 @@ public class CommentController {
         return DailyfeedServerResponse.<CommentDto.Comment>builder()
                 .status(HttpStatus.OK.value())
                 .result(ResponseSuccessCode.SUCCESS)
-                .content(result)
+                .data(result)
                 .build();
     }
 
@@ -122,7 +122,7 @@ public class CommentController {
         return DailyfeedServerResponse.<Boolean>builder()
                 .status(HttpStatus.OK.value())
                 .result(ResponseSuccessCode.SUCCESS)
-                .content(result)
+                .data(result)
                 .build();
     }
 
@@ -136,7 +136,7 @@ public class CommentController {
         return DailyfeedServerResponse.<CommentDto.Comment>builder()
                 .status(HttpStatus.OK.value())
                 .result(ResponseSuccessCode.SUCCESS)
-                .content(result)
+                .data(result)
                 .build();
     }
 
@@ -152,7 +152,7 @@ public class CommentController {
         return DailyfeedPageResponse.<CommentDto.Comment>builder()
                 .status(HttpStatus.OK.value())
                 .result(ResponseSuccessCode.SUCCESS)
-                .content(result)
+                .data(result)
                 .build();
     }
 
@@ -166,7 +166,7 @@ public class CommentController {
         return DailyfeedServerResponse.<Boolean>builder()
                 .status(HttpStatus.CREATED.value())
                 .result(ResponseSuccessCode.SUCCESS)
-                .content(Boolean.TRUE)
+                .data(Boolean.TRUE)
                 .build();
     }
 
@@ -180,7 +180,7 @@ public class CommentController {
         return DailyfeedServerResponse.<Boolean>builder()
                 .status(HttpStatus.NO_CONTENT.value())
                 .result(ResponseSuccessCode.SUCCESS)
-                .content(Boolean.TRUE)
+                .data(Boolean.TRUE)
                 .build();
     }
 
