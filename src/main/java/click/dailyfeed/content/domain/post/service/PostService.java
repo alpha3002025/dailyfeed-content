@@ -67,8 +67,8 @@ public class PostService {
         Long authorId = author.getId();
         MemberProfileDto.Summary memberSummary = memberFeignHelper.getMemberSummaryById(authorId, token, response);
 
-        // 본문 저장
-        Post post = Post.newPost(request.getTitle(), request.getContent(), authorId);
+        // 본문 저장 (제목 기능을 그대로 둘지 아직 결정을 못해서 일단은 첫 문장만 떼어두기로 (요약 등..))
+        Post post = Post.newPost("", request.getContent(), authorId);
         Post savedPost = postRepository.save(post);
 
         // mongodb 에 본문 내용 저장

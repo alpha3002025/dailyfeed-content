@@ -34,7 +34,7 @@ spring:
       host: ${REDIS_HOST:redis-master.infra.svc.cluster.local}
     mongodb:
       protocol: mongodb # mongodb+srv or mongodb (atlas 에서만 mongodb+srv)
-      uri: ${MONGODB_CONNECTION_URI:mongodb://dailyfeed:hitEnter###@localhost:27017/dailyfeed}
+      uri: ${MONGODB_CONNECTION_URI:mongodb://dailyfeed:hitEnter###@localhost:27017/dailyfeed?directConnection=true&authSource=admin}
   ## kafka
   kafka:
     bootstrap-servers: ${KAFKA_HOST:localhost}:29092,${KAFKA_HOST:localhost}:29093,${KAFKA_HOST:localhost}:29094
@@ -81,6 +81,11 @@ spring:
         #mechanism: ${KAFKA_SASL_MECHANISM}
         #jaas:
           #config: org.apache.kafka.common.security.scram.ScramLoginModule required username="${KAFKA_USER}" password="${KAFKA_PASSWORD}";
+  web:
+    resources:
+      static-locations: classpath:/static/
+  mvc:
+    static-path-pattern: /static/**
 springdoc:
   packages-to-scan: click.dailyfeed.timeline.domain
   default-consumes-media-type: application/json;charset=UTF-8
@@ -100,6 +105,7 @@ springdoc:
 ## Logging
 logging:
   level:
+    feign: DEBUG
     click.dailyfeed.timeline.client: DEBUG
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
