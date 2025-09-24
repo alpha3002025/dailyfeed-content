@@ -186,8 +186,8 @@ public class PostService {
         Post post = postRepository.findByIdAndNotDeleted(postId)
                 .orElseThrow(PostNotFoundException::new);
 
-        // 조회수 증가 (별도 트랜잭션으로 처리)
-        post.incrementLikeCount();
+        // 조회수 증가 (카프카 기반으로 변경 예정 todo)
+        post.incrementViewCount();
 
         // 작성자 정보 조회
         MemberProfileDto.Summary authorSummary = memberFeignHelper.getMemberSummaryById(post.getAuthorId(), token, response);

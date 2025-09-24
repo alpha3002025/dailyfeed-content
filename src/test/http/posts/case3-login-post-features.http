@@ -88,3 +88,12 @@ Authorization: Bearer {{accessToken}}
 GET http://{{baseUrl}}{{case3Path}}
 Authorization: Bearer {{accessToken}}
 
+###############################################################################
+### 4. 글 상세 조회
+###############################################################################
+@case4Path = /api/posts/3
+
+### 4.1. 내가 쓴글 상세 조회
+GET http://{{baseUrl}}{{case4Path}}
+Authorization: Bearer {{accessToken}}
+
