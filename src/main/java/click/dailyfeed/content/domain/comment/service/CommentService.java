@@ -193,10 +193,9 @@ public class CommentService {
     // 특정 게시글의 댓글 목록을 페이징으로 조회
     @Transactional(readOnly = true)
     @Cacheable(value = RedisKeyConstant.CommentService.WEB_GET_COMMENTS_BY_POST_ID, key = "'postId_'+#postId+'_page_'+#pageable.getPageNumber()+'_size_'+#pageable.getPageSize()")
-    public DailyfeedPage<CommentDto.Comment> getCommentsByPostWithPaging(Long postId, int page, int size, String token, HttpServletResponse httpResponse) {
+    public DailyfeedPage<CommentDto.Comment> getCommentsByPostWithPaging(Long postId, Pageable pageable, String token, HttpServletResponse httpResponse) {
         Post post = getPostByIdOrThrow(postId);
 
-        Pageable pageable = PageRequest.of(page, size);
         Page<Comment> comments = commentRepository.findTopLevelCommentsByPostWithPaging(post, pageable);
 
         return mergeAuthorDataRecursively(comments, token, httpResponse);

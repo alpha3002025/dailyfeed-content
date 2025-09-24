@@ -14,6 +14,9 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
@@ -64,13 +67,18 @@ public class CommentController {
     // 특정 게시글의 댓글 목록을 페이징으로 조회
     @GetMapping("/post/{postId}")
     public DailyfeedPageResponse<CommentDto.Comment> getCommentsByPost(
+            @AuthenticatedMember MemberDto.Member requestedMember,
             @RequestHeader("Authorization") String authorizationHeader,
             HttpServletResponse httpResponse,
             @PathVariable Long postId,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @PageableDefault(
+                    page = 0,
+                    size = 10,
+                    sort = "createdAt",
+                    direction = Sort.Direction.DESC
+            ) Pageable pageable) {
 
-        DailyfeedPage<CommentDto.Comment> result = commentService.getCommentsByPostWithPaging(postId, page, size, authorizationHeader, httpResponse);
+        DailyfeedPage<CommentDto.Comment> result = commentService.getCommentsByPostWithPaging(postId, pageable, authorizationHeader, httpResponse);
         return DailyfeedPageResponse.<CommentDto.Comment>builder()
                 .status(HttpStatus.OK.value())
                 .result(ResponseSuccessCode.SUCCESS)
