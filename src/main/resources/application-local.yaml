@@ -34,7 +34,7 @@ spring:
       host: ${REDIS_HOST:redis-master.infra.svc.cluster.local}
     mongodb:
       protocol: mongodb # mongodb+srv or mongodb (atlas 에서만 mongodb+srv)
-      uri: ${MONGODB_CONNECTION_URI:mongodb://dailyfeed:hitEnter###@localhost:27017/dailyfeed?directConnection=true&authSource=admin}
+      uri: ${MONGODB_CONNECTION_URI:mongodb://localhost:27017/dailyfeed?directConnection=true}
   ## kafka
   kafka:
     bootstrap-servers: ${KAFKA_HOST:localhost}:29092,${KAFKA_HOST:localhost}:29093,${KAFKA_HOST:localhost}:29094
@@ -67,7 +67,7 @@ spring:
       buffer-memory: 33554432
       compression-type: snappy
       properties:
-        enable.idempotence: true
+        enable.idempotence: false
         max.in.flight.requests.per.connection: 5
         spring.json.add.type.headers: false
 #        spring.json.trusted.packages: "click.dailyfeed.code.domain.content.post.dto"
