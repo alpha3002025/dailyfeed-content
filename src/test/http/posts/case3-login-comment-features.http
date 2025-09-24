@@ -1,0 +1,92 @@
+### Authentication Controller E2E Tests
+### Base URL and Environment Variables
+@baseUrl = {{baseUrl}}
+
+###############################################################################
+### 1. 로그인
+###############################################################################
+@case1Path = /api/authentication
+
+### 1. 로그인
+POST http://localhost:8084{{case1Path}}/login
+Content-Type: application/json
+
+{
+  "email": "case3_C@gmail.com",
+  "password": "Password123!@#$"
+}
+
+> {%
+    // 로그인 응답 확인
+    client.log("Login Response Status: " + response.status);
+
+    // 토큰 저장
+    try {
+        var token = null;
+
+        // Authorization 헤더에서 토큰 확인 (메인 소스)
+        var authHeader = response.headers.valueOf("Authorization");
+        if (authHeader && authHeader.startsWith("Bearer ")) {
+            token = authHeader.substring(7);
+            client.log("✓ Found token in Authorization header");
+        }
+
+        // 토큰 저장
+        if (token) {
+            client.global.set("accessToken", token);
+            client.log("✓ Access Token saved: " + token);
+
+            // 디버깅: 저장된 토큰 확인
+            var savedToken = client.global.get("accessToken");
+            client.log("✓ Verified saved token: " + (savedToken ? "OK" : "Failed"));
+        } else {
+            client.log("✗ No access token found in Authorization header");
+
+            // 모든 헤더 출력 (디버깅용)
+            client.log("Available headers: " + response.headers.valuesOf().join(", "));
+        }
+
+        // 응답 상태 확인
+        if (response.body) {
+            client.log("Login status: ok=" + response.body.ok + ", reason=" + response.body.reason);
+        }
+    } catch (e) {
+        client.log("Error: " + e.message);
+    }
+
+    client.test("Token received", function() {
+        var savedToken = client.global.get("accessToken");
+        client.assert(savedToken !== null && savedToken !== undefined, "Token received and saved");
+    });
+%}
+
+###############################################################################
+### 2. 댓글 작성
+###############################################################################
+@case2Path = /api/comments
+
+### 2.1. 댓글 작성
+POST {{baseUrl}}{{case2Path}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "content": "글 정말 재밌게 잘 읽었습니다4",
+  "postId": 3,
+  "parentId": null
+}
+
+
+### etc. 사용자 조회
+GET http://localhost:8084/api/members
+Authorization: Bearer {{accessToken}}
+
+################################################################################
+#### 3. 글 목록 조회
+################################################################################
+#@case3Path = /api/posts
+#
+#### 3.1. 내가 쓴글 목록 조회
+#GET http://{{baseUrl}}{{case3Path}}
+#Authorization: Bearer {{accessToken}}
+

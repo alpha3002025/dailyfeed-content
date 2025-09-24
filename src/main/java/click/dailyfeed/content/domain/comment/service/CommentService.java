@@ -56,9 +56,8 @@ public class CommentService {
     private static final int MAX_COMMENT_DEPTH = 2; // 최대 댓글 깊이 제한
 
     // 댓글 작성
-    public CommentDto.Comment createComment(MemberDto.Member member, String token, CommentDto.CreateCommentRequest request, HttpServletResponse httpResponse) {
-        MemberProfileDto.Summary author = memberFeignHelper.getMemberSummaryById(member.getId(), token, httpResponse);
-        Long authorId = author.getId();
+    public CommentDto.Comment createComment(MemberProfileDto.Summary member, String token, CommentDto.CreateCommentRequest request, HttpServletResponse httpResponse) {
+        Long authorId = member.getId();
 
         // 게시글 존재 확인
         Post post = getPostByIdOrThrow(request.getPostId());
@@ -98,8 +97,8 @@ public class CommentService {
         Comment savedComment = commentRepository.save(comment);
 
         // 응답 생성 및 작성자 정보 추가
-        CommentDto.Comment commentDto = commentMapper.toCommentNonRecursive(savedComment, author);
-        mergeAuthorData(List.of(commentDto), httpResponse);
+        CommentDto.Comment commentDto = commentMapper.toCommentNonRecursive(savedComment, member);
+        mergeAuthorAtComment(commentDto, member);
 
         // timeline 을 위한 활동 기록
         publishCommentActivity(member.getId(), savedComment.getId(), CommentActivityType.CREATE);
@@ -141,7 +140,7 @@ public class CommentService {
 
         // 응답 생성 및 작성자 정보 추가
         CommentDto.Comment commentUpdated = commentMapper.toCommentNonRecursive(updatedComment, author);
-        mergeAuthorData(List.of(commentUpdated), httpResponse);
+        mergeAuthorAtCommentList(List.of(commentUpdated), token, httpResponse);
 
         return commentUpdated;
     }
@@ -182,31 +181,31 @@ public class CommentService {
     // 특정 게시글의 댓글 목록 조회 (계층구조)
     @Transactional(readOnly = true)
     @Cacheable(value = RedisKeyConstant.CommentService.WEB_GET_COMMENTS_BY_POST_ID, key = "'postId_'+#postId+'_page_'+#pageable.getPageNumber()+'_size_'+#pageable.getPageSize()")
-    public DailyfeedPage<CommentDto.Comment> getCommentsByPost(Long postId, Pageable pageable, HttpServletResponse httpResponse) {
+    public DailyfeedPage<CommentDto.Comment> getCommentsByPost(Long postId, Pageable pageable, String token, HttpServletResponse httpResponse) {
         Post post = getPostByIdOrThrow(postId);
 
         Page<Comment> topLevelComments = commentRepository.findCommentsByPost(post, pageable);
 
         // 모든 댓글(자식 포함)의 작성자 정보 추가
-         return mergeAuthorDataRecursively(topLevelComments, httpResponse);
+         return mergeAuthorDataRecursively(topLevelComments, token, httpResponse);
     }
 
     // 특정 게시글의 댓글 목록을 페이징으로 조회
     @Transactional(readOnly = true)
     @Cacheable(value = RedisKeyConstant.CommentService.WEB_GET_COMMENTS_BY_POST_ID, key = "'postId_'+#postId+'_page_'+#pageable.getPageNumber()+'_size_'+#pageable.getPageSize()")
-    public DailyfeedPage<CommentDto.Comment> getCommentsByPostWithPaging(Long postId, int page, int size, HttpServletResponse httpResponse) {
+    public DailyfeedPage<CommentDto.Comment> getCommentsByPostWithPaging(Long postId, int page, int size, String token, HttpServletResponse httpResponse) {
         Post post = getPostByIdOrThrow(postId);
 
         Pageable pageable = PageRequest.of(page, size);
         Page<Comment> comments = commentRepository.findTopLevelCommentsByPostWithPaging(post, pageable);
 
-        return mergeAuthorDataRecursively(comments, httpResponse);
+        return mergeAuthorDataRecursively(comments, token, httpResponse);
     }
 
     // 대댓글 목록 조회
     @Transactional(readOnly = true)
     @Cacheable(value = RedisKeyConstant.CommentService.WEB_GET_COMMENTS_BY_PARENT_ID, key = "'parentId_'+#parentId+'_page_'+#page+'_size_'+#size")
-    public DailyfeedPage<CommentDto.Comment> getRepliesByParent(Long parentId, int page, int size, HttpServletResponse httpResponse) {
+    public DailyfeedPage<CommentDto.Comment> getRepliesByParent(Long parentId, int page, int size, String token, HttpServletResponse httpResponse) {
         Comment parentComment = commentRepository.findByIdAndNotDeleted(parentId)
                 .orElseThrow(ParentCommentNotFoundException::new);
 
@@ -217,7 +216,7 @@ public class CommentService {
                 .map(commentMapper::toCommentNonRecursive)
                 .collect(Collectors.toList());
 
-        mergeAuthorData(commentList, httpResponse);
+        mergeAuthorAtCommentList(commentList, token, httpResponse);
 
         return pageMapper.fromJpaPageToDailyfeedPage(replies, commentList);
     }
@@ -225,37 +224,37 @@ public class CommentService {
     // 댓글 상세 조회
     @Transactional(readOnly = true)
     @Cacheable(value = RedisKeyConstant.CommentService.WEB_GET_COMMENT_BY_ID, key = "#commentId")
-    public CommentDto.Comment getCommentById(Long commentId, HttpServletResponse httpResponse) {
+    public CommentDto.Comment getCommentById(Long commentId, String token, HttpServletResponse httpResponse) {
         Comment comment = commentRepository.findByIdAndNotDeleted(commentId)
                 .orElseThrow(CommentNotFoundException::new);
 
         CommentDto.Comment commentDto = commentMapper.toCommentNonRecursive(comment);
-        mergeAuthorData(List.of(commentDto), httpResponse);
+        mergeAuthorAtCommentList(List.of(commentDto), token, httpResponse);
         return commentDto;
     }
 
     // 나의 댓글
     @Transactional(readOnly = true)
     @Cacheable(value = RedisKeyConstant.CommentService.WEB_GET_COMMENTS_BY_MEMBER_ID, key = "'memberId_'+#memberId+'_page_'+#page+'_size_'+#size")
-    public DailyfeedPage<CommentDto.CommentSummary> getMyComments(Long memberId, int page, int size, HttpServletResponse httpResponse) {
+    public DailyfeedPage<CommentDto.CommentSummary> getMyComments(Long memberId, int page, int size, String token, HttpServletResponse httpResponse) {
         Pageable pageable = PageRequest.of(page, size);
         Page<Comment> comments = commentRepository.findByAuthorIdAndNotDeleted(memberId, pageable);
 
-        return mergeAuthorData(comments, httpResponse);
+        return mergeAuthorData(comments, token, httpResponse);
     }
 
     // 특정 사용자의 댓글 목록
     @Transactional(readOnly = true)
     @Cacheable(value = RedisKeyConstant.CommentService.WEB_GET_COMMENTS_BY_MEMBER_ID, key = "'memberId_'+#memberId+'_page_'+#page+'_size_'+#size")
-    public DailyfeedPage<CommentDto.CommentSummary> getCommentsByUser(Long memberId, int page, int size, HttpServletResponse httpResponse) {
+    public DailyfeedPage<CommentDto.CommentSummary> getCommentsByUser(Long memberId, int page, int size, String token, HttpServletResponse httpResponse) {
         Pageable pageable = PageRequest.of(page, size);
         Page<Comment> comments = commentRepository.findByAuthorIdAndNotDeleted(memberId, pageable);
 
-        return mergeAuthorData(comments, httpResponse);
+        return mergeAuthorData(comments, token, httpResponse);
     }
 
     /// helpers
-    public DailyfeedPage<CommentDto.CommentSummary> mergeAuthorData(Page<Comment> commentsPage, HttpServletResponse httpResponse) {
+    public DailyfeedPage<CommentDto.CommentSummary> mergeAuthorData(Page<Comment> commentsPage, String token, HttpServletResponse httpResponse) {
         List<CommentDto.CommentSummary> summaries = commentsPage.getContent().stream().map(commentMapper::toCommentSummary).collect(Collectors.toList());
         if (summaries.isEmpty()) return pageMapper.emptyPage();
 
@@ -263,7 +262,7 @@ public class CommentService {
                 .map(CommentDto.CommentSummary::getAuthorId)
                 .collect(Collectors.toSet());
 
-        Map<Long, MemberProfileDto.Summary> authorMap = memberFeignHelper.getMemberMap(authorIds, httpResponse);
+        Map<Long, MemberProfileDto.Summary> authorMap = memberFeignHelper.getMemberMap(authorIds, token, httpResponse);
 
         summaries.forEach(summary -> {
             MemberProfileDto.Summary author = authorMap.get(summary.getAuthorId());
@@ -276,7 +275,7 @@ public class CommentService {
     }
 
     // 계층구조 댓글에 작성자 정보 추가 (재귀적)
-    private DailyfeedPage<CommentDto.Comment> mergeAuthorDataRecursively(Page<Comment> commentsPage, HttpServletResponse httpResponse) {
+    private DailyfeedPage<CommentDto.Comment> mergeAuthorDataRecursively(Page<Comment> commentsPage, String token, HttpServletResponse httpResponse) {
         if(commentsPage.isEmpty()) return pageMapper.emptyPage();
 
         List<CommentDto.Comment> commentList = commentsPage.getContent().stream().map(commentMapper::toCommentNonRecursive).collect(Collectors.toList());
@@ -285,7 +284,7 @@ public class CommentService {
                 .map(CommentDto.Comment::getAuthorId)
                 .collect(Collectors.toSet());
 
-        Map<Long, MemberProfileDto.Summary> authorMap = memberFeignHelper.getMemberMap(authorIds, httpResponse);
+        Map<Long, MemberProfileDto.Summary> authorMap = memberFeignHelper.getMemberMap(authorIds, token, httpResponse);
 
         commentList.forEach(comment -> {
             MemberProfileDto.Summary author = authorMap.get(comment.getAuthorId());
@@ -298,7 +297,11 @@ public class CommentService {
 
     }
 
-    private void mergeAuthorData(List<CommentDto.Comment> comments, HttpServletResponse httpResponse) {
+    private void mergeAuthorAtComment(CommentDto.Comment comment, MemberProfileDto.Summary summary){
+        comment.updateAuthor(summary);
+    }
+
+    private void mergeAuthorAtCommentList(List<CommentDto.Comment> comments, String token, HttpServletResponse httpResponse){
         if (comments.isEmpty()) return;
 
         Set<Long> authorIds = comments.stream()
@@ -306,7 +309,7 @@ public class CommentService {
                 .collect(Collectors.toSet());
 
         try {
-            Map<Long, MemberProfileDto.Summary> authorMap = memberFeignHelper.getMemberMap(authorIds, httpResponse);
+            Map<Long, MemberProfileDto.Summary> authorMap = memberFeignHelper.getMemberMap(authorIds, token, httpResponse);
 
             comments.forEach(comment -> {
                 MemberProfileDto.Summary author = authorMap.get(comment.getAuthorId());

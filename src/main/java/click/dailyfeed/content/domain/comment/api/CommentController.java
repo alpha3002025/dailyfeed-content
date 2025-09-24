@@ -2,12 +2,14 @@ package click.dailyfeed.content.domain.comment.api;
 
 import click.dailyfeed.code.domain.content.comment.dto.CommentDto;
 import click.dailyfeed.code.domain.member.member.dto.MemberDto;
+import click.dailyfeed.code.domain.member.member.dto.MemberProfileDto;
 import click.dailyfeed.code.global.web.code.ResponseSuccessCode;
 import click.dailyfeed.code.global.web.page.DailyfeedPage;
 import click.dailyfeed.code.global.web.response.DailyfeedPageResponse;
 import click.dailyfeed.code.global.web.response.DailyfeedServerResponse;
 import click.dailyfeed.content.domain.comment.service.CommentService;
-import click.dailyfeed.feign.config.web.AuthenticatedMember;
+import click.dailyfeed.feign.config.web.annotation.AuthenticatedMember;
+import click.dailyfeed.feign.config.web.annotation.AuthenticatedMemberProfileSummary;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -24,9 +26,9 @@ public class CommentController {
 
     ///  /comments  ///
     // 댓글 작성
-    @PostMapping("/")
+    @PostMapping({"","/"})
     public DailyfeedServerResponse<CommentDto.Comment> createComment(
-            @AuthenticatedMember MemberDto.Member member,
+            @AuthenticatedMemberProfileSummary MemberProfileDto.Summary member,
             @RequestHeader("Authorization") String authorizationHeader,
             HttpServletResponse httpResponse,
             @Valid @RequestBody CommentDto.CreateCommentRequest request) {
@@ -41,11 +43,12 @@ public class CommentController {
     // 내 댓글 목록
     @GetMapping("/")
     public DailyfeedPageResponse<CommentDto.CommentSummary> getMyComments(
+            @RequestHeader("Authorization") String authorizationHeader,
             HttpServletResponse httpResponse,
             @AuthenticatedMember MemberDto.Member requestedMember,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        DailyfeedPage<CommentDto.CommentSummary> result = commentService.getMyComments(requestedMember.getId(), page, size, httpResponse);
+        DailyfeedPage<CommentDto.CommentSummary> result = commentService.getMyComments(requestedMember.getId(), page, size, authorizationHeader, httpResponse);
         return DailyfeedPageResponse.<CommentDto.CommentSummary>builder()
                 .status(HttpStatus.OK.value())
                 .result(ResponseSuccessCode.SUCCESS)
@@ -61,12 +64,13 @@ public class CommentController {
     // 특정 게시글의 댓글 목록을 페이징으로 조회
     @GetMapping("/post/{postId}")
     public DailyfeedPageResponse<CommentDto.Comment> getCommentsByPost(
+            @RequestHeader("Authorization") String authorizationHeader,
             HttpServletResponse httpResponse,
             @PathVariable Long postId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        DailyfeedPage<CommentDto.Comment> result = commentService.getCommentsByPostWithPaging(postId, page, size, httpResponse);
+        DailyfeedPage<CommentDto.Comment> result = commentService.getCommentsByPostWithPaging(postId, page, size, authorizationHeader, httpResponse);
         return DailyfeedPageResponse.<CommentDto.Comment>builder()
                 .status(HttpStatus.OK.value())
                 .result(ResponseSuccessCode.SUCCESS)
@@ -78,12 +82,13 @@ public class CommentController {
     // 특정 사용자의 댓글 목록
     @GetMapping("/member/{memberId}")
     public DailyfeedPageResponse<CommentDto.CommentSummary> getCommentsByUser(
+            @RequestHeader("Authorization") String authorizationHeader,
             HttpServletResponse httpResponse,
             @PathVariable Long memberId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        DailyfeedPage<CommentDto.CommentSummary> result = commentService.getCommentsByUser(memberId, page, size, httpResponse);
+        DailyfeedPage<CommentDto.CommentSummary> result = commentService.getCommentsByUser(memberId, page, size, authorizationHeader, httpResponse);
         return DailyfeedPageResponse.<CommentDto.CommentSummary>builder()
                 .status(HttpStatus.OK.value())
                 .result(ResponseSuccessCode.SUCCESS)
@@ -129,10 +134,11 @@ public class CommentController {
     // 댓글 상세 조회
     @GetMapping("/{commentId}")
     public DailyfeedServerResponse<CommentDto.Comment> getComment(
+            @RequestHeader("Authorization") String authorizationHeader,
             HttpServletResponse httpResponse,
             @PathVariable Long commentId) {
 
-        CommentDto.Comment result = commentService.getCommentById(commentId, httpResponse);
+        CommentDto.Comment result = commentService.getCommentById(commentId, authorizationHeader, httpResponse);
         return DailyfeedServerResponse.<CommentDto.Comment>builder()
                 .status(HttpStatus.OK.value())
                 .result(ResponseSuccessCode.SUCCESS)
@@ -143,12 +149,13 @@ public class CommentController {
     // 대댓글 목록 조회
     @GetMapping("/{commentId}/replies")
     public DailyfeedPageResponse<CommentDto.Comment> getRepliesByParent(
+            @RequestHeader("Authorization") String authorizationHeader,
             HttpServletResponse httpResponse,
             @PathVariable Long commentId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
 
-        DailyfeedPage<CommentDto.Comment> result = commentService.getRepliesByParent(commentId, page, size, httpResponse);
+        DailyfeedPage<CommentDto.Comment> result = commentService.getRepliesByParent(commentId, page, size, authorizationHeader, httpResponse);
         return DailyfeedPageResponse.<CommentDto.Comment>builder()
                 .status(HttpStatus.OK.value())
                 .result(ResponseSuccessCode.SUCCESS)

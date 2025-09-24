@@ -7,7 +7,7 @@ import click.dailyfeed.code.global.web.page.DailyfeedPage;
 import click.dailyfeed.code.global.web.response.DailyfeedPageResponse;
 import click.dailyfeed.code.global.web.response.DailyfeedServerResponse;
 import click.dailyfeed.content.domain.post.service.PostService;
-import click.dailyfeed.feign.config.web.AuthenticatedMember;
+import click.dailyfeed.feign.config.web.annotation.AuthenticatedMember;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -164,7 +164,7 @@ public class PostController {
                     direction = Sort.Direction.DESC
             ) Pageable pageable) {
 
-        DailyfeedPage<PostDto.Post> result = postService.getPostsByAuthor(authorId, token, pageable, httpResponse);
+        DailyfeedPage<PostDto.Post> result = postService.getPostsByAuthor(authorId, pageable, token, httpResponse);
         return DailyfeedPageResponse.<PostDto.Post>builder()
                 .status(HttpStatus.OK.value())
                 .result(ResponseSuccessCode.SUCCESS)
@@ -196,13 +196,14 @@ public class PostController {
     // 특정 기간 내 게시글 조회
     @GetMapping("/date-range")
     public DailyfeedPageResponse<PostDto.Post> getPostsByDateRange(
+            @RequestHeader("Authorization") String token,
             HttpServletResponse httpResponse,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        DailyfeedPage<PostDto.Post> result = postService.getPostsByDateRange(startDate, endDate, page, size, httpResponse);
+        DailyfeedPage<PostDto.Post> result = postService.getPostsByDateRange(startDate, endDate, page, size, token, httpResponse);
         return DailyfeedPageResponse.<PostDto.Post>builder()
                 .status(HttpStatus.OK.value())
                 .result(ResponseSuccessCode.SUCCESS)
@@ -214,11 +215,12 @@ public class PostController {
     // (timeline 으로 이관 예정(/timeline/feed/popular/most-commented))
     @GetMapping("/popular-by-comments")
     public DailyfeedPageResponse<PostDto.Post> getPostsOrderByCommentCount(
+            @RequestHeader("Authorization") String token,
             HttpServletResponse httpResponse,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        DailyfeedPage<PostDto.Post> result = postService.getPostsOrderByCommentCount(page, size, httpResponse);
+        DailyfeedPage<PostDto.Post> result = postService.getPostsOrderByCommentCount(page, size, token, httpResponse);
         return DailyfeedPageResponse.<PostDto.Post>builder()
                 .status(HttpStatus.OK.value())
                 .result(ResponseSuccessCode.SUCCESS)
@@ -230,11 +232,12 @@ public class PostController {
     // (timeline 으로 이관 예정(/timeline/feed/popular))
     @GetMapping("/popular")
     public DailyfeedPageResponse<PostDto.Post> getPopularPosts(
+            @RequestHeader("Authorization") String token,
             HttpServletResponse httpResponse,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        DailyfeedPage<PostDto.Post> result = postService.getPopularPosts(page, size, httpResponse);
+        DailyfeedPage<PostDto.Post> result = postService.getPopularPosts(page, size, token, httpResponse);
         return DailyfeedPageResponse.<PostDto.Post>builder()
                 .status(HttpStatus.OK.value())
                 .result(ResponseSuccessCode.SUCCESS)
@@ -246,11 +249,12 @@ public class PostController {
     // (timeline 으로 이관 예정 (/timeline/feed/latest))
     @GetMapping("/recent-activity")
     public DailyfeedPageResponse<PostDto.Post> getPostsByRecentActivity(
+            @RequestHeader("Authorization") String token,
             HttpServletResponse httpResponse,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        DailyfeedPage<PostDto.Post> result = postService.getPostsByRecentActivity(page, size, httpResponse);
+        DailyfeedPage<PostDto.Post> result = postService.getPostsByRecentActivity(page, size, token, httpResponse);
         return DailyfeedPageResponse.<PostDto.Post>builder()
                 .status(HttpStatus.OK.value())
                 .result(ResponseSuccessCode.SUCCESS)
@@ -262,12 +266,13 @@ public class PostController {
     // (timeline 으로 이관 예정 (/timeline/search))
     @GetMapping("/search")
     public DailyfeedPageResponse<PostDto.Post> searchPosts(
+            @RequestHeader("Authorization") String token,
             HttpServletResponse httpResponse,
             @RequestParam String keyword,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        DailyfeedPage<PostDto.Post> result = postService.searchPosts(keyword, page, size, httpResponse);
+        DailyfeedPage<PostDto.Post> result = postService.searchPosts(keyword, page, size, token, httpResponse);
         return DailyfeedPageResponse.<PostDto.Post>builder()
                 .status(HttpStatus.OK.value())
                 .result(ResponseSuccessCode.SUCCESS)
