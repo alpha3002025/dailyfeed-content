@@ -321,4 +321,12 @@ public class PostService {
 
         return pageMapper.fromJpaPageToDailyfeedPage(posts, mergeAuthorAndCommentCount(posts.getContent(), httpResponse));
     }
+
+    @Transactional(readOnly = true)
+    public DailyfeedPage<PostDto.Post> getMyPosts(MemberDto.Member requestedMember, Pageable pageable, String token, HttpServletResponse httpResponse) {
+        Page<Post> page = postRepository.findByAuthorIdAndNotDeleted(requestedMember.getId(), pageable);
+        MemberProfileDto.Summary memberSummary = memberFeignHelper.getMemberSummaryById(requestedMember.getId(), token, httpResponse);
+        List<PostDto.Post> content = page.getContent().stream().map(p -> postMapper.toPostDto(p, memberSummary)).toList();
+        return pageMapper.fromJpaPageToDailyfeedPage(page, content);
+    }
 }

@@ -75,6 +75,16 @@ Content-Type: application/json
 }
 
 
-### 사용자 조회
+### etc. 사용자 조회
 GET http://localhost:8084/api/members
 Authorization: Bearer {{accessToken}}
+
+###############################################################################
+### 3. 글 목록 조회
+###############################################################################
+@case3Path = /api/posts
+
+### 3.1. 내가 쓴글 목록 조회
+GET http://{{baseUrl}}{{case3Path}}
+Authorization: Bearer {{accessToken}}
+

@@ -30,24 +30,7 @@ import java.util.List;
 public class PostController {
     private final PostService postService;
 
-    /// 특정 post Id 리스트에 해당되는 글 목록
-    @Operation(summary = "특정 post id 리스트에 해당하는 글 목록", description = "글 id 목록에 대한 글 데이터 목록을 조회합니다.")
-    @PostMapping  ("/list")
-    public DailyfeedServerResponse<List<PostDto.Post>> getPostListByIdsIn(
-            @AuthenticatedMember MemberDto.Member member,
-            @RequestHeader(value = "Authorization", required = false) String token,
-            HttpServletResponse httpResponse,
-            PostDto.PostsBulkRequest request
-    ){
-
-        List<PostDto.Post> result = postService.getPostListByIdsIn(request, token, httpResponse);
-        return DailyfeedServerResponse.<List<PostDto.Post>>builder()
-                .status(HttpStatus.OK.value())
-                .result(ResponseSuccessCode.SUCCESS)
-                .data(result)
-                .build();
-    }
-
+    /// entity
     // 게시글 작성
     @Operation(summary = "게시글 작성", description = "새로운 게시글을 작성합니다.")
     @PostMapping
@@ -97,6 +80,28 @@ public class PostController {
                 .data(result)
                 .build();
     }
+
+    @Operation(summary = "내가 쓴 개시글 목록 조회", description = "내가 쓴 개시글 목록을 조회합니다.")
+    @GetMapping({"","/"})
+    public DailyfeedPageResponse<PostDto.Post> getPosts(
+            @AuthenticatedMember MemberDto.Member member,
+            HttpServletResponse httpResponse,
+            @RequestHeader("Authorization") String token,
+            @PageableDefault(
+                    page = 0,
+                    size = 10,
+                    sort = "createdAt",
+                    direction = Sort.Direction.DESC
+            ) Pageable pageable
+    ) {
+        DailyfeedPage<PostDto.Post> result = postService.getMyPosts(member, pageable, token, httpResponse);
+        return DailyfeedPageResponse.<PostDto.Post>builder()
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
+                .data(result)
+                .build();
+    }
+
 
     // 게시글 상세 조회
     @Operation(summary = "게시글 상세 조회", description = "특정 게시글의 상세 정보를 조회합니다.")
@@ -166,6 +171,26 @@ public class PostController {
                 .data(result)
                 .build();
     }
+
+    /// 특수목적 or internal
+    /// 특정 post Id 리스트에 해당되는 글 목록
+    @Operation(summary = "특정 post id 리스트에 해당하는 글 목록", description = "글 id 목록에 대한 글 데이터 목록을 조회합니다.")
+    @PostMapping  ("/query/list")
+    public DailyfeedServerResponse<List<PostDto.Post>> getPostListByIdsIn(
+            @AuthenticatedMember MemberDto.Member member,
+            @RequestHeader(value = "Authorization", required = false) String token,
+            HttpServletResponse httpResponse,
+            PostDto.PostsBulkRequest request
+    ){
+
+        List<PostDto.Post> result = postService.getPostListByIdsIn(request, token, httpResponse);
+        return DailyfeedServerResponse.<List<PostDto.Post>>builder()
+                .status(HttpStatus.OK.value())
+                .result(ResponseSuccessCode.SUCCESS)
+                .data(result)
+                .build();
+    }
+
 
     // TODO : timeline-svc 으로 이관
     // 특정 기간 내 게시글 조회
