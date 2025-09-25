@@ -180,7 +180,7 @@ public class PostController {
             @AuthenticatedMember MemberDto.Member member,
             @RequestHeader(value = "Authorization", required = false) String token,
             HttpServletResponse httpResponse,
-            PostDto.PostsBulkRequest request
+            @RequestBody PostDto.PostsBulkRequest request
     ){
 
         List<PostDto.Post> result = postService.getPostListByIdsIn(request, token, httpResponse);

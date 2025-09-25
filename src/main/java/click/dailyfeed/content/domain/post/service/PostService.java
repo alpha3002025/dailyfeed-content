@@ -56,9 +56,22 @@ public class PostService {
     private final DatePeriodBasedPageKeyGenerator datePeriodBasedPageKeyGenerator;
 
     // 특정 post id 리스트에 해당하는 post 리스트 조회
-    @Cacheable(value = RedisKeyConstant.PostService.INTERNAL_LIST_GET_POST_LIST_BY_IDS_IN, key = "#request.ids", cacheManager = "redisCacheManager")
+    @Cacheable(value = RedisKeyConstant.PostService.INTERNAL_LIST_GET_POST_LIST_BY_IDS_IN, keyGenerator = "postIdsKeyGenerator", cacheManager = "redisCacheManager")
     public List<PostDto.Post> getPostListByIdsIn(PostDto.PostsBulkRequest request, String token, HttpServletResponse httpResponse) {
-        return postFeignHelper.getPostList(request, token, httpResponse);
+        // Set이 비어있는 경우 빈 리스트 반환
+        if (request.getIds() == null || request.getIds().isEmpty()) {
+            return List.of();  // 빈 List 반환
+        }
+
+        List<Post> result = postRepository.findPostsByIdsInNotDeletedOrderByCreatedDateDesc(request.getIds());
+
+        Set<Long> authorIds = result.stream().map(p -> p.getAuthorId()).collect(Collectors.toSet());
+        Map<Long, MemberProfileDto.Summary> authorMap = memberFeignHelper
+                .getMembersList(authorIds, token, httpResponse)
+                .stream()
+                .collect(Collectors.toMap(s -> s.getMemberId(), s -> s));
+
+        return result.stream().map(post -> postMapper.toPostDto(post, authorMap.get(post.getAuthorId()))).toList();
     }
 
     // 게시글 작성
