@@ -153,11 +153,19 @@ infrastructure:
         dead-letter-list-key: POST_ACTIVITY_EVENT_HISTORY_DEAD
         batch-size: 1000
   kafka:
+    default:
+      producer:
+        partition: 6
+        replication-factor: 2
+        compression: snappy
+        retention-ms: 604800000 # 7일
+        operation-timeout-seconds: 30
     topic:
       post-activity:
         prefix: post-activity-
         prefix-date-format: yyyyMMdd
         retention-ms: 604800000 # 7일
+        min-insync.replicas: 1 # 쓰기 작업에 필요한 최소 동기화된 레플리카 수
     consumers:
       # Post Activity Consumer
       post-activity:

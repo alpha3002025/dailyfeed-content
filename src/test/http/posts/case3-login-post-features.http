@@ -93,7 +93,22 @@ Authorization: Bearer {{accessToken}}
 ###############################################################################
 @case4Path = /api/posts/3
 
-### 4.1. 내가 쓴글 상세 조회
+### 4.1. 내가 쓴 글 상세 조회
 GET http://{{baseUrl}}{{case4Path}}
 Authorization: Bearer {{accessToken}}
 
+
+###############################################################################
+### 5. 글 좋아요, 좋아요 취소
+###############################################################################
+@case5Path = /api/posts/3/like
+
+### 5.1. 게시글 좋아요
+POST http://{{baseUrl}}{{case5Path}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+### 5.2. 게시글 좋아요 취소
+DELETE http://{{baseUrl}}{{case5Path}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
