@@ -74,13 +74,6 @@ spring:
         spring.json.trusted.packages: "*"
         retry.backoff.ms: 100
         request.timeout.ms: 30000
-    #properties:
-      #security:
-        #protocol: ${KAFKA_SASL_PROTOCOL}
-      #sasl:
-        #mechanism: ${KAFKA_SASL_MECHANISM}
-        #jaas:
-          #config: org.apache.kafka.common.security.scram.ScramLoginModule required username="${KAFKA_USER}" password="${KAFKA_PASSWORD}";
   web:
     resources:
       static-locations: classpath:/static/

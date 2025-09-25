@@ -140,7 +140,7 @@ public class PostService {
         try{
             LocalDateTime now = postEventMapper.currentDateTime();
             String topicName = DateBasedTopicType.POST_ACTIVITY.generateTopicName(now);
-            PostDto.PostActivityEvent activityEvent = postEventMapper.newPostActivityEvent(postId, memberId, activityType, now);
+            PostDto.PostActivityEvent activityEvent = postEventMapper.newPostActivityEvent(memberId, postId, activityType, now);
             kafkaHelper.send(topicName, postId.toString(), activityEvent);
         }
         catch (Exception e){
