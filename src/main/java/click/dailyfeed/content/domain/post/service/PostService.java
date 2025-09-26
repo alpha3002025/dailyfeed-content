@@ -192,6 +192,14 @@ public class PostService {
         oldDocument.softDelete();
     }
 
+    @Transactional(readOnly = true)
+    public DailyfeedPage<PostDto.Post> getMyPosts(MemberDto.Member requestedMember, Pageable pageable, String token, HttpServletResponse httpResponse) {
+        Page<Post> page = postRepository.findByAuthorIdAndNotDeleted(requestedMember.getId(), pageable);
+        MemberProfileDto.Summary memberSummary = memberFeignHelper.getMemberSummaryById(requestedMember.getId(), token, httpResponse);
+        List<PostDto.Post> content = page.getContent().stream().map(p -> postMapper.toPostDto(p, memberSummary)).toList();
+        return pageMapper.fromJpaPageToDailyfeedPage(page, content);
+    }
+
     // 게시글 상세 조회 (조회수 증가)
     @Transactional(readOnly = true)
     @Cacheable(value = RedisKeyConstant.PostService.WEB_GET_POST_BY_ID, key = "#postId", cacheManager = "redisCacheManager")
@@ -243,40 +251,6 @@ public class PostService {
         return pageMapper.fromJpaPageToDailyfeedPage(posts, mergeAuthorAndCommentCount(posts.getContent(), token, httpResponse));
     }
 
-    // 댓글이 많은 게시글 조회 (댓글 수로 정렬)
-    @Transactional(readOnly = true)
-    @Cacheable(value = RedisKeyConstant.PostService.WEB_GET_POSTS_ORDER_BY_COMMENT_COUNT, key = "'__page:'+#page+'_size:'+#size", cacheManager = "redisCacheManager")
-    public DailyfeedPage<PostDto.Post> getPostsOrderByCommentCount(int page, int size, String token, HttpServletResponse httpResponse) {
-        Pageable pageable = PageRequest.of(page, size);
-        Page<Post> posts = postRepository.findMostCommentedPosts(pageable);
-
-        return pageMapper.fromJpaPageToDailyfeedPage(posts, mergeAuthorAndCommentCount(posts.getContent(), token, httpResponse));
-    }
-
-    // 인기 게시글 조회
-    @Transactional(readOnly = true)
-    @Cacheable(value = RedisKeyConstant.PostService.WEB_STATISTICS_GET_POPULAR_POSTS, key = "'__page:'+#page+'_size:'+#size", cacheManager = "redisCacheManager")
-    public DailyfeedPage<PostDto.Post> getPopularPosts(int page, int size, String token, HttpServletResponse httpResponse) {
-        log.info("Getting popular posts");
-
-        Pageable pageable = PageRequest.of(page, size);
-        Page<Post> posts = postRepository.findPopularPostsNotDeleted(pageable);
-
-        return pageMapper.fromJpaPageToDailyfeedPage(posts, mergeAuthorAndCommentCount(posts.getContent(), token, httpResponse));
-    }
-
-    // 최근 댓글이 있는 게시글 조회
-    @Transactional(readOnly = true)
-    @Cacheable(value = RedisKeyConstant.PostService.WEB_STATISTICS_GET_POSTS_BY_RECENT_ACTIVITY, key = "'__page:'+#page+'_size:'+#size", cacheManager = "redisCacheManager")
-    public DailyfeedPage<PostDto.Post> getPostsByRecentActivity(int page, int size, String token, HttpServletResponse httpResponse) {
-        log.info("Getting posts by recent activity");
-
-        Pageable pageable = PageRequest.of(page, size);
-        Page<Post> posts = postRepository.findPostsByRecentActivity(pageable);
-
-        return pageMapper.fromJpaPageToDailyfeedPage(posts, mergeAuthorAndCommentCount(posts.getContent(), token, httpResponse));
-    }
-
     // 게시글 검색
     @Transactional(readOnly = true)
     @Cacheable(value = RedisKeyConstant.PostService.WEB_SEARCH_SEARCH_POSTS, key = "#keyword+'__page:'+#page+'_size:'+#size", cacheManager = "redisCacheManager")
@@ -285,18 +259,6 @@ public class PostService {
 
         Pageable pageable = PageRequest.of(page, size);
         Page<Post> posts = postRepository.findByTitleOrContentContainingAndNotDeleted(keyword, pageable);
-
-        return pageMapper.fromJpaPageToDailyfeedPage(posts, mergeAuthorAndCommentCount(posts.getContent(), token, httpResponse));
-    }
-
-    // 특정 기간 내 게시글 조회 (필요할지는 모르겠지만...)
-    @Transactional(readOnly = true)
-    @Cacheable(value = RedisKeyConstant.PostService.WEB_SEARCH_GET_POSTS_BY_DATE_RANGE, keyGenerator = "datePeriodBasedPageKeyGenerator", cacheManager = "redisCacheManager")
-    public DailyfeedPage<PostDto.Post> getPostsByDateRange(LocalDateTime startDate, LocalDateTime endDate, int page, int size, String token, HttpServletResponse httpResponse) {
-        log.info("Getting posts between {} and {}", startDate, endDate);
-
-        Pageable pageable = PageRequest.of(page, size);
-        Page<Post> posts = postRepository.findByCreatedDateBetweenAndNotDeleted(startDate, endDate, pageable);
 
         return pageMapper.fromJpaPageToDailyfeedPage(posts, mergeAuthorAndCommentCount(posts.getContent(), token, httpResponse));
     }
@@ -321,13 +283,5 @@ public class PostService {
     public int deletePostsByAuthor(Long authorId) {
         log.info("Admin deleting all posts by author: {}", authorId);
         return postRepository.softDeleteByAuthorId(authorId);
-    }
-
-    @Transactional(readOnly = true)
-    public DailyfeedPage<PostDto.Post> getMyPosts(MemberDto.Member requestedMember, Pageable pageable, String token, HttpServletResponse httpResponse) {
-        Page<Post> page = postRepository.findByAuthorIdAndNotDeleted(requestedMember.getId(), pageable);
-        MemberProfileDto.Summary memberSummary = memberFeignHelper.getMemberSummaryById(requestedMember.getId(), token, httpResponse);
-        List<PostDto.Post> content = page.getContent().stream().map(p -> postMapper.toPostDto(p, memberSummary)).toList();
-        return pageMapper.fromJpaPageToDailyfeedPage(page, content);
     }
 }
