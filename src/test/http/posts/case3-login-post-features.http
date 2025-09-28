@@ -12,7 +12,7 @@ POST http://localhost:8084{{case1Path}}/login
 Content-Type: application/json
 
 {
-  "email": "case3_C@gmail.com",
+  "email": "case3_E@gmail.com",
   "password": "Password123!@#$"
 }
 
@@ -74,41 +74,56 @@ Content-Type: application/json
   "content": "안녕하세요1"
 }
 
-
 ### etc. 사용자 조회
 GET http://localhost:8084/api/members
 Authorization: Bearer {{accessToken}}
 
-###############################################################################
-### 3. 글 목록 조회
-###############################################################################
-@case3Path = /api/posts
-
-### 3.1. 내가 쓴글 목록 조회
-GET http://{{baseUrl}}{{case3Path}}
-Authorization: Bearer {{accessToken}}
 
 ###############################################################################
-### 4. 글 상세 조회
+### 3. 글 수정
 ###############################################################################
-@case4Path = /api/posts/3
+@case3Path = /api/posts/2
 
-### 4.1. 내가 쓴 글 상세 조회
-GET http://{{baseUrl}}{{case4Path}}
-Authorization: Bearer {{accessToken}}
-
-
-###############################################################################
-### 5. 글 좋아요, 좋아요 취소
-###############################################################################
-@case5Path = /api/posts/3/like
-
-### 5.1. 게시글 좋아요
-POST http://{{baseUrl}}{{case5Path}}
+### 3.1. 글 수정
+PUT {{baseUrl}}{{case3Path}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
-### 5.2. 게시글 좋아요 취소
-DELETE http://{{baseUrl}}{{case5Path}}
+{
+  "content": "배고파? 배민시켜!! https://www.baemin.com/"
+}
+
+
+###############################################################################
+### 4. 글 목록 조회
+###############################################################################
+@case4Path = /api/posts
+
+### 4.1. 내가 쓴글 목록 조회
+GET {{baseUrl}}{{case4Path}}
+Authorization: Bearer {{accessToken}}
+
+###############################################################################
+### 5. 글 상세 조회
+###############################################################################
+@case5Path = /api/posts/3
+
+### 4.1. 내가 쓴 글 상세 조회
+GET {{baseUrl}}{{case5Path}}
+Authorization: Bearer {{accessToken}}
+
+
+###############################################################################
+### 6. 글 좋아요, 좋아요 취소
+###############################################################################
+@case6Path = /api/posts/3/like
+
+### 6.1. 게시글 좋아요
+POST http://{{baseUrl}}{{case6Path}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+### 6.2. 게시글 좋아요 취소
+DELETE http://{{baseUrl}}{{case6Path}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
