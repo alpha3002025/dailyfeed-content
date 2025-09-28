@@ -15,6 +15,7 @@ public class PostMapper {
                 .authorId(author != null ? author.getId() : null)
                 .authorName(author != null ? author.getDisplayName() : null)
                 .authorHandle(author != null ? author.getMemberHandle() : null)
+                .authorAvatarUrl(author != null ? author.getAvatarUrl() : null)
                 .viewCount(post.getViewCount())
                 .likeCount(post.getLikeCount())
                 .commentCount(post.getCommentsCount())
