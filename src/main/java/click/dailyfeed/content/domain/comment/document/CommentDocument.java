@@ -66,7 +66,6 @@ public class CommentDocument {
                 .build();
     }
 
-    // 글 수정시 기존 post 도큐먼트는 isCurrent = false 처리, 기존 도큐먼트를 복사한 새로운 도큐먼트를 추가 후 isCurrent = true 로 지정
     public static CommentDocument newUpdatedPost(CommentDocument commentDocument, LocalDateTime updatedAt){
         return CommentDocument.updatedCommentBuilder()
                 .oldDocument(commentDocument)
