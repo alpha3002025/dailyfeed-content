@@ -13,11 +13,13 @@ import click.dailyfeed.code.global.cache.RedisKeyConstant;
 import click.dailyfeed.code.global.kafka.exception.KafkaNetworkErrorException;
 import click.dailyfeed.code.global.kafka.type.DateBasedTopicType;
 import click.dailyfeed.code.global.web.page.DailyfeedPage;
+import click.dailyfeed.content.domain.comment.repository.mongo.CommentMongoRepository;
 import click.dailyfeed.content.domain.post.document.PostDocument;
 import click.dailyfeed.content.domain.post.entity.Post;
 import click.dailyfeed.content.domain.post.mapper.PostEventMapper;
 import click.dailyfeed.content.domain.post.mapper.PostMapper;
 import click.dailyfeed.content.domain.post.repository.jpa.PostRepository;
+import click.dailyfeed.content.domain.post.repository.mongo.PostLikeMongoRepository;
 import click.dailyfeed.content.domain.post.repository.mongo.PostMongoRepository;
 import click.dailyfeed.feign.domain.member.MemberFeignHelper;
 import click.dailyfeed.feign.domain.post.PostFeignHelper;
@@ -47,6 +49,8 @@ import java.util.stream.Collectors;
 public class PostService {
     private final PostRepository postRepository;
     private final PostMongoRepository postMongoRepository;
+    private final PostLikeMongoRepository postLikeMongoRepository;
+    private final CommentMongoRepository commentMongoRepository;
     private final PostMapper postMapper;
     private final PostEventMapper postEventMapper;
     private final PageMapper pageMapper;
@@ -64,14 +68,35 @@ public class PostService {
         }
 
         List<Post> result = postRepository.findPostsByIdsInNotDeletedOrderByCreatedDateDesc(request.getIds());
-
         Set<Long> authorIds = result.stream().map(p -> p.getAuthorId()).collect(Collectors.toSet());
+
         Map<Long, MemberProfileDto.Summary> authorMap = memberFeignHelper
                 .getMembersList(authorIds, token, httpResponse)
                 .stream()
                 .collect(Collectors.toMap(s -> s.getMemberId(), s -> s));
 
-        return result.stream().map(post -> postMapper.toPostDto(post, authorMap.get(post.getAuthorId()))).toList();
+        PostStatisticsInternal statistics = postStatisticsCount(request);
+        Map<Long, PostDto.PostLikeCountStatistics> postLikeCountStatisticsMap = statistics.postLikeCountStatisticsMap();
+        Map<Long, PostDto.PostCommentCountStatistics> commentCountStatisticsMap = statistics.commentCountStatisticsMap();
+
+        return result.stream().map(post -> postMapper.toPostDto(post, authorMap.get(post.getAuthorId()), postLikeCountStatisticsMap.get(post.getId()), commentCountStatisticsMap.get(post.getId()))).toList();
+    }
+
+    private record PostStatisticsInternal(
+            Map<Long, PostDto.PostLikeCountStatistics> postLikeCountStatisticsMap,
+            Map<Long, PostDto.PostCommentCountStatistics> commentCountStatisticsMap
+    ){}
+
+    public PostStatisticsInternal postStatisticsCount(PostDto.PostsBulkRequest request){
+        Map<Long, PostDto.PostLikeCountStatistics> postLikeCountStatisticsMap = postLikeMongoRepository.countLikesByPostPks(request.getIds())
+                .stream().map(postMapper::toPostLikeStatistics)
+                .collect(Collectors.toMap(o -> o.getPostPk(), o -> o));
+
+        Map<Long, PostDto.PostCommentCountStatistics> commentCountStatisticsMap = commentMongoRepository.countCommentsByPostPks(request.getIds())
+                .stream().map(postMapper::toPostCommentCountStatistics)
+                .collect(Collectors.toMap(o -> o.getPostPk(), o -> o));
+
+        return new PostStatisticsInternal(postLikeCountStatisticsMap, commentCountStatisticsMap);
     }
 
     // 게시글 작성
@@ -91,7 +116,7 @@ public class PostService {
         publishPostActivity(authorId, savedPost.getId(), PostActivityType.CREATE);
 
         // return
-        return postMapper.toPostDto(post, memberSummary);
+        return postMapper.toPostDto(post, memberSummary, null, null);
     }
 
     public void insertNewDocument(Post post){
@@ -121,8 +146,10 @@ public class PostService {
         // timeline 조회를 위한 활동 기록 이벤트 발행
         publishPostActivity(author.getId(), post.getId(), PostActivityType.UPDATE);
 
+        PostStatisticsInternal postStatisticsInternal = postStatisticsCount(PostDto.PostsBulkRequest.builder().ids(Set.of(postId)).build());
+
         // return
-        return postMapper.toPostDto(post, memberSummary);
+        return postMapper.toPostDto(post, memberSummary, postStatisticsInternal.postLikeCountStatisticsMap().get(postId), postStatisticsInternal.commentCountStatisticsMap().get(postId));
     }
 
     public void updateDocument(Post post){
@@ -195,8 +222,15 @@ public class PostService {
     @Transactional(readOnly = true)
     public DailyfeedPage<PostDto.Post> getMyPosts(MemberDto.Member requestedMember, Pageable pageable, String token, HttpServletResponse httpResponse) {
         Page<Post> page = postRepository.findByAuthorIdAndNotDeleted(requestedMember.getId(), pageable);
+        Set<Long> postPks = page.getContent().stream().map(Post::getId).collect(Collectors.toSet());
+
         MemberProfileDto.Summary memberSummary = memberFeignHelper.getMemberSummaryById(requestedMember.getId(), token, httpResponse);
-        List<PostDto.Post> content = page.getContent().stream().map(p -> postMapper.toPostDto(p, memberSummary)).toList();
+
+        PostStatisticsInternal statistics = postStatisticsCount(PostDto.PostsBulkRequest.builder().ids(postPks).build());
+        Map<Long, PostDto.PostLikeCountStatistics> postLikeCountStatisticsMap = statistics.postLikeCountStatisticsMap();
+        Map<Long, PostDto.PostCommentCountStatistics> commentCountStatisticsMap = statistics.commentCountStatisticsMap();
+
+        List<PostDto.Post> content = page.getContent().stream().map(p -> postMapper.toPostDto(p, memberSummary, postLikeCountStatisticsMap.get(p.getId()), commentCountStatisticsMap.get(p.getId()))).toList();
         return pageMapper.fromJpaPageToDailyfeedPage(page, content);
     }
 
@@ -213,7 +247,11 @@ public class PostService {
         // 작성자 정보 조회
         MemberProfileDto.Summary authorSummary = memberFeignHelper.getMemberSummaryById(post.getAuthorId(), token, response);
 
-        return postMapper.toPostDto(post, authorSummary);
+        PostStatisticsInternal statistics = postStatisticsCount(PostDto.PostsBulkRequest.builder().ids(Set.of(postId)).build());
+        Map<Long, PostDto.PostLikeCountStatistics> postLikeCountStatisticsMap = statistics.postLikeCountStatisticsMap();
+        Map<Long, PostDto.PostCommentCountStatistics> commentCountStatisticsMap = statistics.commentCountStatisticsMap();
+
+        return postMapper.toPostDto(post, authorSummary, postLikeCountStatisticsMap.get(postId), commentCountStatisticsMap.get(postId));
     }
 
     // 게시글 좋아요 증가
@@ -272,9 +310,17 @@ public class PostService {
         // (2) 작성자 상세 정보
         Map<Long, MemberProfileDto.Summary> authorsMap = memberFeignHelper.getMemberMap(authorIds, token, httpResponse);
 
+        Set<Long> postIds = posts.stream().map(Post::getId).collect(Collectors.toSet());
+        PostStatisticsInternal statistics = postStatisticsCount(PostDto.PostsBulkRequest.builder().ids(postIds).build());
+
         return posts.stream()
                 .map(post -> {
-                    return postMapper.toPostDto(post, authorsMap.get(post.getAuthorId()), post.getCommentsCount());
+                    PostDto.PostCommentCountStatistics postCountStatistics = statistics.commentCountStatisticsMap.get(post.getId());
+                    Long commentCounts = 0L;
+                    if (postCountStatistics != null){
+                        commentCounts = postCountStatistics.getCommentCount() != null ? postCountStatistics.getCommentCount() : 0L;
+                    }
+                    return postMapper.toPostDto(post, authorsMap.get(post.getAuthorId()), commentCounts);
                 })
                 .collect(Collectors.toList());
     }

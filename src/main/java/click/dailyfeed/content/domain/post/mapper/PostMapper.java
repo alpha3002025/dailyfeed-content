@@ -2,12 +2,14 @@ package click.dailyfeed.content.domain.post.mapper;
 
 import click.dailyfeed.code.domain.content.post.dto.PostDto;
 import click.dailyfeed.code.domain.member.member.dto.MemberProfileDto;
+import click.dailyfeed.content.domain.comment.projection.PostCommentCountProjection;
 import click.dailyfeed.content.domain.post.entity.Post;
+import click.dailyfeed.content.domain.post.projection.PostLikeCountProjection;
 import org.springframework.stereotype.Component;
 
 @Component
 public class PostMapper {
-    public PostDto.Post toPostDto(Post post, MemberProfileDto.Summary author){
+    public PostDto.Post toPostDto(Post post, MemberProfileDto.Summary author, PostDto.PostLikeCountStatistics postLikeStatistics, PostDto.PostCommentCountStatistics commentCountStatistics) {
         return PostDto.Post.builder()
                 .id(post.getId())
                 .title(post.getTitle())
@@ -17,14 +19,14 @@ public class PostMapper {
                 .authorHandle(author != null ? author.getMemberHandle() : null)
                 .authorAvatarUrl(author != null ? author.getAvatarUrl() : null)
                 .viewCount(post.getViewCount())
-                .likeCount(post.getLikeCount())
-                .commentCount(post.getCommentsCount())
+                .likeCount(postLikeStatistics != null ? postLikeStatistics.getLikeCount() : 0L)
+                .commentCount(commentCountStatistics != null ? commentCountStatistics.getCommentCount() : 0L)
                 .createdAt(post.getCreatedAt())
                 .updatedAt(post.getUpdatedAt())
                 .build();
     }
 
-    public PostDto.Post toPostDto(Post post, MemberProfileDto.Summary author, Integer commentCount){
+    public PostDto.Post toPostDto(Post post, MemberProfileDto.Summary author, Long commentCount){
         return PostDto.Post.builder()
                 .id(post.getId())
                 .title(post.getTitle())
@@ -37,6 +39,22 @@ public class PostMapper {
                 .commentCount(commentCount)
                 .createdAt(post.getCreatedAt())
                 .updatedAt(post.getUpdatedAt())
+                .build();
+    }
+
+    /// 본문 좋아요 카운트 객체 변환
+    public PostDto.PostLikeCountStatistics toPostLikeStatistics(PostLikeCountProjection postLikeCountProjection) {
+        return PostDto.PostLikeCountStatistics.builder()
+                .postPk(postLikeCountProjection.getPostPk())
+                .likeCount(postLikeCountProjection.getLikeCount())
+                .build();
+    }
+
+    /// 본문 댓글 수 카운트 객체 변환
+    public PostDto.PostCommentCountStatistics toPostCommentCountStatistics(PostCommentCountProjection postCommentCountProjection) {
+        return PostDto.PostCommentCountStatistics.builder()
+                .postPk(postCommentCountProjection.getPostPk())
+                .commentCount(postCommentCountProjection.getCommentCount())
                 .build();
     }
 }
