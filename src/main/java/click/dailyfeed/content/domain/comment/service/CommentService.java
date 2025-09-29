@@ -148,7 +148,7 @@ public class CommentService {
     // 본문 검색 용도의 컬렉션 'comments' 에 저장
     public void updateDocument(Comment comment){
         CommentDocument oldDocument = commentMongoRepository
-                .findByCommentPkAndIsDeletedAndIsCurrent(comment.getId(), Boolean.FALSE, Boolean.TRUE)
+                .findByCommentPkAndIsDeleted(comment.getId(), Boolean.FALSE)
                 .orElseThrow(click.dailyfeed.code.domain.content.post.exception.PostNotFoundException::new);
 
         oldDocument.softDelete();

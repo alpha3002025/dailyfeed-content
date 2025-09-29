@@ -7,5 +7,5 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 import java.util.Optional;
 
 public interface PostMongoRepository extends MongoRepository<PostDocument, ObjectId> {
-    Optional<PostDocument> findByPostPkAndIsDeletedAndIsCurrent(Long postPk, Boolean isDeleted, Boolean isCurrent);
+    Optional<PostDocument> findByPostPkAndIsDeleted(Long postPk, Boolean isDeleted);
 }

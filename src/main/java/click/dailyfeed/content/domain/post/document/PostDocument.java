@@ -35,15 +35,6 @@ public class PostDocument {
     @Field("is_deleted")
     private Boolean isDeleted;
 
-    @Field("comment_count")
-    private Integer commentCount;
-
-    @Field("is_current")
-    private Boolean isCurrent;
-
-    @Field("version")
-    private Integer version;
-
     @Builder(builderMethodName = "newPostBuilder", builderClassName = "NewPost")
     private PostDocument(Long postPk, String title, String content, LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.postPk = postPk;
@@ -52,9 +43,6 @@ public class PostDocument {
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
         this.isDeleted = false;
-        this.commentCount = 0;
-        this.isCurrent = true;
-        this.version = 1;
     }
 
     @Builder(builderMethodName = "updatedPostBuilder", builderClassName = "UpdatedPost")
@@ -65,9 +53,6 @@ public class PostDocument {
         this.createdAt = oldDocument.getCreatedAt();
         this.updatedAt =  updatedAt;
         this.isDeleted = Boolean.FALSE;
-        this.isCurrent = Boolean.TRUE;
-        this.commentCount = oldDocument.getCommentCount();
-        this.version = oldDocument.getVersion() + 1;
     }
 
     public static PostDocument newPost(Long postPk, String title, String content, LocalDateTime createdAt, LocalDateTime updatedAt){
@@ -80,7 +65,6 @@ public class PostDocument {
                 .build();
     }
 
-    // 글 수정시 기존 post 도큐먼트는 isCurrent = false 처리, 기존 도큐먼트를 복사한 새로운 도큐먼트를 추가 후 isCurrent = true 로 지정
     public static PostDocument newUpdatedPost(PostDocument postDocument, LocalDateTime updatedAt){
         return PostDocument.updatedPostBuilder()
                 .oldDocument(postDocument)

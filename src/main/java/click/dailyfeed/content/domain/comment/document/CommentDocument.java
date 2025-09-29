@@ -1,6 +1,5 @@
 package click.dailyfeed.content.domain.comment.document;
 
-import click.dailyfeed.content.domain.post.document.PostDocument;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -37,12 +36,6 @@ public class CommentDocument {
     @Field("is_deleted")
     private Boolean isDeleted;
 
-    @Field("is_current")
-    private Boolean isCurrent;
-
-    @Field("version")
-    private Integer version;
-
     @Builder(builderMethodName = "newCommentBuilder", builderClassName = "NewPost")
     private CommentDocument(Long postPk, Long commentPk, String content, LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.postPk = postPk;
@@ -51,8 +44,6 @@ public class CommentDocument {
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
         this.isDeleted = false;
-        this.isCurrent = true;
-        this.version = 1;
     }
 
     @Builder(builderMethodName = "updatedCommentBuilder", builderClassName = "UpdatedPost")
@@ -63,8 +54,6 @@ public class CommentDocument {
         this.createdAt = oldDocument.getCreatedAt();
         this.updatedAt =  updatedAt;
         this.isDeleted = Boolean.FALSE;
-        this.isCurrent = Boolean.TRUE;
-        this.version = oldDocument.getVersion() + 1;
     }
 
     public static CommentDocument newComment(Long postPk, Long commentPk, String content, LocalDateTime createdAt, LocalDateTime updatedAt){

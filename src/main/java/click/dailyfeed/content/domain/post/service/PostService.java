@@ -127,7 +127,7 @@ public class PostService {
 
     public void updateDocument(Post post){
         PostDocument oldDocument = postMongoRepository
-                .findByPostPkAndIsDeletedAndIsCurrent(post.getId(), Boolean.FALSE, Boolean.TRUE)
+                .findByPostPkAndIsDeleted(post.getId(), Boolean.FALSE)
                 .orElseThrow(PostNotFoundException::new);
 
         oldDocument.softDelete();
@@ -186,7 +186,7 @@ public class PostService {
 
     public void deletePostDocument(Post post){
         PostDocument oldDocument = postMongoRepository
-                .findByPostPkAndIsDeletedAndIsCurrent(post.getId(), Boolean.FALSE, Boolean.TRUE)
+                .findByPostPkAndIsDeleted(post.getId(), Boolean.FALSE)
                 .orElseThrow(PostNotFoundException::new);
 
         oldDocument.softDelete();

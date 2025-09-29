@@ -7,5 +7,5 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 import java.util.Optional;
 
 public interface CommentMongoRepository extends MongoRepository<CommentDocument, ObjectId> {
-    Optional<CommentDocument> findByCommentPkAndIsDeletedAndIsCurrent(Long commentPk, Boolean isDeleted, Boolean isCurrent);
+    Optional<CommentDocument> findByCommentPkAndIsDeleted(Long commentPk, Boolean isDeleted);
 }
