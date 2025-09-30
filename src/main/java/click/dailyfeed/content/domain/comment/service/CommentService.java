@@ -4,11 +4,8 @@ import click.dailyfeed.code.domain.content.comment.dto.CommentDto;
 import click.dailyfeed.code.domain.content.comment.exception.*;
 import click.dailyfeed.code.domain.content.comment.type.CommentActivityType;
 import click.dailyfeed.code.domain.content.comment.type.CommentLikeType;
-import click.dailyfeed.code.domain.member.member.code.MemberExceptionCode;
 import click.dailyfeed.code.domain.member.member.dto.MemberDto;
 import click.dailyfeed.code.domain.member.member.dto.MemberProfileDto;
-import click.dailyfeed.code.domain.member.member.exception.MemberException;
-import click.dailyfeed.code.global.cache.RedisKeyConstant;
 import click.dailyfeed.code.global.kafka.exception.KafkaNetworkErrorException;
 import click.dailyfeed.code.global.kafka.type.DateBasedTopicType;
 import click.dailyfeed.code.global.web.page.DailyfeedPage;
@@ -26,10 +23,7 @@ import click.dailyfeed.pagination.mapper.PageMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -138,9 +132,10 @@ public class CommentService {
         // mongodb 에 본문 저장
         updateDocument(comment);
 
+        // TODO timelineFeignHelper 에서 조회
         // 응답 생성 및 작성자 정보 추가
         CommentDto.Comment commentUpdated = commentMapper.toCommentNonRecursive(updatedComment, author);
-        mergeAuthorAtCommentList(List.of(commentUpdated), token, httpResponse);
+//        mergeAuthorAtCommentList(List.of(commentUpdated), token, httpResponse);
 
         return commentUpdated;
     }
@@ -178,79 +173,79 @@ public class CommentService {
         return Boolean.TRUE;
     }
 
-    // 특정 게시글의 댓글 목록 조회 (계층구조)
-    @Transactional(readOnly = true)
-    @Cacheable(value = RedisKeyConstant.CommentService.WEB_GET_COMMENTS_BY_POST_ID, key = "'postId_'+#postId+'_page_'+#pageable.getPageNumber()+'_size_'+#pageable.getPageSize()")
-    public DailyfeedPage<CommentDto.Comment> getCommentsByPost(Long postId, Pageable pageable, String token, HttpServletResponse httpResponse) {
-        Post post = getPostByIdOrThrow(postId);
+//    // 특정 게시글의 댓글 목록 조회 (계층구조)
+//    @Transactional(readOnly = true)
+//    @Cacheable(value = RedisKeyConstant.CommentService.WEB_GET_COMMENTS_BY_POST_ID, key = "'postId_'+#postId+'_page_'+#pageable.getPageNumber()+'_size_'+#pageable.getPageSize()")
+//    public DailyfeedPage<CommentDto.Comment> getCommentsByPost(Long postId, Pageable pageable, String token, HttpServletResponse httpResponse) {
+//        Post post = getPostByIdOrThrow(postId);
+//
+//        Page<Comment> topLevelComments = commentRepository.findCommentsByPost(post, pageable);
+//
+//        // 모든 댓글(자식 포함)의 작성자 정보 추가
+//         return mergeAuthorDataRecursively(topLevelComments, token, httpResponse);
+//    }
 
-        Page<Comment> topLevelComments = commentRepository.findCommentsByPost(post, pageable);
+//    // 특정 게시글의 댓글 목록을 페이징으로 조회
+//    @Transactional(readOnly = true)
+//    @Cacheable(value = RedisKeyConstant.CommentService.WEB_GET_COMMENTS_BY_POST_ID, key = "'postId_'+#postId+'_page_'+#pageable.getPageNumber()+'_size_'+#pageable.getPageSize()")
+//    public DailyfeedPage<CommentDto.Comment> getCommentsByPostWithPaging(Long postId, Pageable pageable, String token, HttpServletResponse httpResponse) {
+//        Post post = getPostByIdOrThrow(postId);
+//
+//        Page<Comment> comments = commentRepository.findTopLevelCommentsByPostWithPaging(post, pageable);
+//
+//        return mergeAuthorDataRecursively(comments, token, httpResponse);
+//    }
 
-        // 모든 댓글(자식 포함)의 작성자 정보 추가
-         return mergeAuthorDataRecursively(topLevelComments, token, httpResponse);
-    }
+//    // 대댓글 목록 조회
+//    @Transactional(readOnly = true)
+//    @Cacheable(value = RedisKeyConstant.CommentService.WEB_GET_COMMENTS_BY_PARENT_ID, key = "'parentId_'+#parentId+'_page_'+#page+'_size_'+#size")
+//    public DailyfeedPage<CommentDto.Comment> getRepliesByParent(Long parentId, int page, int size, String token, HttpServletResponse httpResponse) {
+//        Comment parentComment = commentRepository.findByIdAndNotDeleted(parentId)
+//                .orElseThrow(ParentCommentNotFoundException::new);
+//
+//        Pageable pageable = PageRequest.of(page, size);
+//        Page<Comment> replies = commentRepository.findChildrenByParentWithPaging(parentComment, pageable);
+//
+//        List<CommentDto.Comment> commentList = replies.getContent().stream()
+//                .map(commentMapper::toCommentNonRecursive)
+//                .collect(Collectors.toList());
+//
+//        mergeAuthorAtCommentList(commentList, token, httpResponse);
+//
+//        return pageMapper.fromJpaPageToDailyfeedPage(replies, commentList);
+//    }
 
-    // 특정 게시글의 댓글 목록을 페이징으로 조회
-    @Transactional(readOnly = true)
-    @Cacheable(value = RedisKeyConstant.CommentService.WEB_GET_COMMENTS_BY_POST_ID, key = "'postId_'+#postId+'_page_'+#pageable.getPageNumber()+'_size_'+#pageable.getPageSize()")
-    public DailyfeedPage<CommentDto.Comment> getCommentsByPostWithPaging(Long postId, Pageable pageable, String token, HttpServletResponse httpResponse) {
-        Post post = getPostByIdOrThrow(postId);
-
-        Page<Comment> comments = commentRepository.findTopLevelCommentsByPostWithPaging(post, pageable);
-
-        return mergeAuthorDataRecursively(comments, token, httpResponse);
-    }
-
-    // 대댓글 목록 조회
-    @Transactional(readOnly = true)
-    @Cacheable(value = RedisKeyConstant.CommentService.WEB_GET_COMMENTS_BY_PARENT_ID, key = "'parentId_'+#parentId+'_page_'+#page+'_size_'+#size")
-    public DailyfeedPage<CommentDto.Comment> getRepliesByParent(Long parentId, int page, int size, String token, HttpServletResponse httpResponse) {
-        Comment parentComment = commentRepository.findByIdAndNotDeleted(parentId)
-                .orElseThrow(ParentCommentNotFoundException::new);
-
-        Pageable pageable = PageRequest.of(page, size);
-        Page<Comment> replies = commentRepository.findChildrenByParentWithPaging(parentComment, pageable);
-
-        List<CommentDto.Comment> commentList = replies.getContent().stream()
-                .map(commentMapper::toCommentNonRecursive)
-                .collect(Collectors.toList());
-
-        mergeAuthorAtCommentList(commentList, token, httpResponse);
-
-        return pageMapper.fromJpaPageToDailyfeedPage(replies, commentList);
-    }
-
-    // 댓글 상세 조회
-    @Transactional(readOnly = true)
-    @Cacheable(value = RedisKeyConstant.CommentService.WEB_GET_COMMENT_BY_ID, key = "#commentId")
-    public CommentDto.Comment getCommentById(Long commentId, String token, HttpServletResponse httpResponse) {
-        Comment comment = commentRepository.findByIdAndNotDeleted(commentId)
-                .orElseThrow(CommentNotFoundException::new);
-
-        CommentDto.Comment commentDto = commentMapper.toCommentNonRecursive(comment);
-        mergeAuthorAtCommentList(List.of(commentDto), token, httpResponse);
-        return commentDto;
-    }
+//    // 댓글 상세 조회
+//    @Transactional(readOnly = true)
+//    @Cacheable(value = RedisKeyConstant.CommentService.WEB_GET_COMMENT_BY_ID, key = "#commentId")
+//    public CommentDto.Comment getCommentById(Long commentId, String token, HttpServletResponse httpResponse) {
+//        Comment comment = commentRepository.findByIdAndNotDeleted(commentId)
+//                .orElseThrow(CommentNotFoundException::new);
+//
+//        CommentDto.Comment commentDto = commentMapper.toCommentNonRecursive(comment);
+//        mergeAuthorAtCommentList(List.of(commentDto), token, httpResponse);
+//        return commentDto;
+//    }
 
     // 나의 댓글
-    @Transactional(readOnly = true)
-    @Cacheable(value = RedisKeyConstant.CommentService.WEB_GET_COMMENTS_BY_MEMBER_ID, key = "'memberId_'+#memberId+'_page_'+#page+'_size_'+#size")
-    public DailyfeedPage<CommentDto.CommentSummary> getMyComments(Long memberId, int page, int size, String token, HttpServletResponse httpResponse) {
-        Pageable pageable = PageRequest.of(page, size);
-        Page<Comment> comments = commentRepository.findByAuthorIdAndNotDeleted(memberId, pageable);
+//    @Transactional(readOnly = true)
+//    @Cacheable(value = RedisKeyConstant.CommentService.WEB_GET_COMMENTS_BY_MEMBER_ID, key = "'memberId_'+#memberId+'_page_'+#page+'_size_'+#size")
+//    public DailyfeedPage<CommentDto.CommentSummary> getMyComments(Long memberId, int page, int size, String token, HttpServletResponse httpResponse) {
+//        Pageable pageable = PageRequest.of(page, size);
+//        Page<Comment> comments = commentRepository.findByAuthorIdAndNotDeleted(memberId, pageable);
+//
+//        return mergeAuthorData(comments, token, httpResponse);
+//    }
 
-        return mergeAuthorData(comments, token, httpResponse);
-    }
-
-    // 특정 사용자의 댓글 목록
-    @Transactional(readOnly = true)
-    @Cacheable(value = RedisKeyConstant.CommentService.WEB_GET_COMMENTS_BY_MEMBER_ID, key = "'memberId_'+#memberId+'_page_'+#page+'_size_'+#size")
-    public DailyfeedPage<CommentDto.CommentSummary> getCommentsByUser(Long memberId, int page, int size, String token, HttpServletResponse httpResponse) {
-        Pageable pageable = PageRequest.of(page, size);
-        Page<Comment> comments = commentRepository.findByAuthorIdAndNotDeleted(memberId, pageable);
-
-        return mergeAuthorData(comments, token, httpResponse);
-    }
+//    // 특정 사용자의 댓글 목록
+//    @Transactional(readOnly = true)
+//    @Cacheable(value = RedisKeyConstant.CommentService.WEB_GET_COMMENTS_BY_MEMBER_ID, key = "'memberId_'+#memberId+'_page_'+#page+'_size_'+#size")
+//    public DailyfeedPage<CommentDto.CommentSummary> getCommentsByUser(Long memberId, int page, int size, String token, HttpServletResponse httpResponse) {
+//        Pageable pageable = PageRequest.of(page, size);
+//        Page<Comment> comments = commentRepository.findByAuthorIdAndNotDeleted(memberId, pageable);
+//
+//        return mergeAuthorData(comments, token, httpResponse);
+//    }
 
     /// helpers
     public DailyfeedPage<CommentDto.CommentSummary> mergeAuthorData(Page<Comment> commentsPage, String token, HttpServletResponse httpResponse) {
@@ -274,53 +269,33 @@ public class CommentService {
     }
 
     // 계층구조 댓글에 작성자 정보 추가 (재귀적)
-    private DailyfeedPage<CommentDto.Comment> mergeAuthorDataRecursively(Page<Comment> commentsPage, String token, HttpServletResponse httpResponse) {
-        if(commentsPage.isEmpty()) return pageMapper.emptyPage();
-
-        List<CommentDto.Comment> commentList = commentsPage.getContent().stream().map(commentMapper::toCommentNonRecursive).collect(Collectors.toList());
-
-        Set<Long> authorIds = commentList.stream()
-                .map(CommentDto.Comment::getAuthorId)
-                .collect(Collectors.toSet());
-
-        Map<Long, MemberProfileDto.Summary> authorMap = memberFeignHelper.getMemberMap(authorIds, token, httpResponse);
-
-        commentList.forEach(comment -> {
-            MemberProfileDto.Summary author = authorMap.get(comment.getAuthorId());
-            if (author != null) {
-                comment.updateAuthorRecursively(authorMap);
-            }
-        });
-
-        return pageMapper.fromJpaPageToDailyfeedPage(commentsPage, commentList);
-
-    }
+//    private DailyfeedPage<CommentDto.Comment> mergeAuthorDataRecursively(Page<Comment> commentsPage, String token, HttpServletResponse httpResponse) {
+//        if(commentsPage.isEmpty()) return pageMapper.emptyPage();
+//
+//        List<CommentDto.Comment> commentList = commentsPage.getContent().stream().map(commentMapper::toCommentNonRecursive).collect(Collectors.toList());
+//
+//        Set<Long> authorIds = commentList.stream()
+//                .map(CommentDto.Comment::getAuthorId)
+//                .collect(Collectors.toSet());
+//
+//        Map<Long, MemberProfileDto.Summary> authorMap = memberFeignHelper.getMemberMap(authorIds, token, httpResponse);
+//
+//        commentList.forEach(comment -> {
+//            MemberProfileDto.Summary author = authorMap.get(comment.getAuthorId());
+//            if (author != null) {
+//                comment.updateAuthorRecursively(authorMap);
+//            }
+//        });
+//
+//        return pageMapper.fromJpaPageToDailyfeedPage(commentsPage, commentList);
+//
+//    }
 
     private void mergeAuthorAtComment(CommentDto.Comment comment, MemberProfileDto.Summary summary){
         comment.updateAuthor(summary);
     }
 
-    private void mergeAuthorAtCommentList(List<CommentDto.Comment> comments, String token, HttpServletResponse httpResponse){
-        if (comments.isEmpty()) return;
 
-        Set<Long> authorIds = comments.stream()
-                .map(CommentDto.Comment::getAuthorId)
-                .collect(Collectors.toSet());
-
-        try {
-            Map<Long, MemberProfileDto.Summary> authorMap = memberFeignHelper.getMemberMap(authorIds, token, httpResponse);
-
-            comments.forEach(comment -> {
-                MemberProfileDto.Summary author = authorMap.get(comment.getAuthorId());
-                if (author != null) {
-                    comment.updateAuthor(author);
-                }
-            });
-        } catch (Exception e) {
-            log.warn("Failed to fetch author info: {}", e.getMessage());
-            throw new MemberException(MemberExceptionCode.MEMBER_API_CONNECTION_ERROR);
-        }
-    }
 
     // 좋아요 증가
     public void incrementLikeCount(MemberDto.Member member, Long commentId) {
