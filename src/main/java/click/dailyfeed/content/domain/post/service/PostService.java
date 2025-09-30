@@ -8,37 +8,24 @@ import click.dailyfeed.code.domain.content.post.type.PostActivityType;
 import click.dailyfeed.code.domain.content.post.type.PostLikeType;
 import click.dailyfeed.code.domain.member.member.dto.MemberDto;
 import click.dailyfeed.code.domain.member.member.dto.MemberProfileDto;
-import click.dailyfeed.code.domain.member.member.exception.MemberNotFoundException;
-import click.dailyfeed.code.global.cache.RedisKeyConstant;
 import click.dailyfeed.code.global.kafka.exception.KafkaNetworkErrorException;
 import click.dailyfeed.code.global.kafka.type.DateBasedTopicType;
-import click.dailyfeed.code.global.web.page.DailyfeedPage;
-import click.dailyfeed.content.domain.comment.repository.mongo.CommentMongoRepository;
 import click.dailyfeed.content.domain.post.document.PostDocument;
 import click.dailyfeed.content.domain.post.entity.Post;
 import click.dailyfeed.content.domain.post.mapper.PostEventMapper;
 import click.dailyfeed.content.domain.post.mapper.PostMapper;
 import click.dailyfeed.content.domain.post.repository.jpa.PostRepository;
-import click.dailyfeed.content.domain.post.repository.mongo.PostLikeMongoRepository;
 import click.dailyfeed.content.domain.post.repository.mongo.PostMongoRepository;
 import click.dailyfeed.feign.domain.member.MemberFeignHelper;
+import click.dailyfeed.feign.domain.timeline.TimelineFeignHelper;
 import click.dailyfeed.kafka.domain.kafka.service.KafkaHelper;
-import click.dailyfeed.pagination.mapper.PageMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.annotation.Cacheable;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -47,53 +34,51 @@ import java.util.stream.Collectors;
 public class PostService {
     private final PostRepository postRepository;
     private final PostMongoRepository postMongoRepository;
-    private final PostLikeMongoRepository postLikeMongoRepository;
-    private final CommentMongoRepository commentMongoRepository;
     private final PostMapper postMapper;
     private final PostEventMapper postEventMapper;
-    private final PageMapper pageMapper;
     private final MemberFeignHelper memberFeignHelper;
+    private final TimelineFeignHelper timelineFeignHelper;
     private final KafkaHelper kafkaHelper;
 
-    // 특정 post id 리스트에 해당하는 post 리스트 조회
-    @Cacheable(value = RedisKeyConstant.PostService.INTERNAL_LIST_GET_POST_LIST_BY_IDS_IN, keyGenerator = "postIdsKeyGenerator", cacheManager = "redisCacheManager")
-    public List<PostDto.Post> getPostListByIdsIn(PostDto.PostsBulkRequest request, String token, HttpServletResponse httpResponse) {
-        // Set이 비어있는 경우 빈 리스트 반환
-        if (request.getIds() == null || request.getIds().isEmpty()) {
-            return List.of();  // 빈 List 반환
-        }
+//    // 특정 post id 리스트에 해당하는 post 리스트 조회
+//    @Cacheable(value = RedisKeyConstant.PostService.INTERNAL_LIST_GET_POST_LIST_BY_IDS_IN, keyGenerator = "postIdsKeyGenerator", cacheManager = "redisCacheManager")
+//    public List<PostDto.Post> getPostListByIdsIn(PostDto.PostsBulkRequest request, String token, HttpServletResponse httpResponse) {
+//        // Set이 비어있는 경우 빈 리스트 반환
+//        if (request.getIds() == null || request.getIds().isEmpty()) {
+//            return List.of();  // 빈 List 반환
+//        }
+//
+//        List<Post> result = postRepository.findPostsByIdsInNotDeletedOrderByCreatedDateDesc(request.getIds());
+//        Set<Long> authorIds = result.stream().map(p -> p.getAuthorId()).collect(Collectors.toSet());
+//
+//        Map<Long, MemberProfileDto.Summary> authorMap = memberFeignHelper
+//                .getMembersList(authorIds, token, httpResponse)
+//                .stream()
+//                .collect(Collectors.toMap(s -> s.getMemberId(), s -> s));
+//
+//        PostStatisticsInternal statistics = queryPostStatistics(request);
+//        Map<Long, PostDto.PostLikeCountStatistics> postLikeCountStatisticsMap = statistics.postLikeCountStatisticsMap();
+//        Map<Long, PostDto.PostCommentCountStatistics> commentCountStatisticsMap = statistics.commentCountStatisticsMap();
+//
+//        return result.stream().map(post -> postMapper.toPostDto(post, authorMap.get(post.getAuthorId()), postLikeCountStatisticsMap.get(post.getId()), commentCountStatisticsMap.get(post.getId()))).toList();
+//    }
 
-        List<Post> result = postRepository.findPostsByIdsInNotDeletedOrderByCreatedDateDesc(request.getIds());
-        Set<Long> authorIds = result.stream().map(p -> p.getAuthorId()).collect(Collectors.toSet());
-
-        Map<Long, MemberProfileDto.Summary> authorMap = memberFeignHelper
-                .getMembersList(authorIds, token, httpResponse)
-                .stream()
-                .collect(Collectors.toMap(s -> s.getMemberId(), s -> s));
-
-        PostStatisticsInternal statistics = queryPostStatistics(request);
-        Map<Long, PostDto.PostLikeCountStatistics> postLikeCountStatisticsMap = statistics.postLikeCountStatisticsMap();
-        Map<Long, PostDto.PostCommentCountStatistics> commentCountStatisticsMap = statistics.commentCountStatisticsMap();
-
-        return result.stream().map(post -> postMapper.toPostDto(post, authorMap.get(post.getAuthorId()), postLikeCountStatisticsMap.get(post.getId()), commentCountStatisticsMap.get(post.getId()))).toList();
-    }
-
-    private record PostStatisticsInternal(
-            Map<Long, PostDto.PostLikeCountStatistics> postLikeCountStatisticsMap,
-            Map<Long, PostDto.PostCommentCountStatistics> commentCountStatisticsMap
-    ){}
-
-    public PostStatisticsInternal queryPostStatistics(PostDto.PostsBulkRequest request){
-        Map<Long, PostDto.PostLikeCountStatistics> postLikeCountStatisticsMap = postLikeMongoRepository.countLikesByPostPks(request.getIds())
-                .stream().map(postMapper::toPostLikeStatistics)
-                .collect(Collectors.toMap(o -> o.getPostPk(), o -> o));
-
-        Map<Long, PostDto.PostCommentCountStatistics> commentCountStatisticsMap = commentMongoRepository.countCommentsByPostPks(request.getIds())
-                .stream().map(postMapper::toPostCommentCountStatistics)
-                .collect(Collectors.toMap(o -> o.getPostPk(), o -> o));
-
-        return new PostStatisticsInternal(postLikeCountStatisticsMap, commentCountStatisticsMap);
-    }
+//    private record PostStatisticsInternal(
+//            Map<Long, PostDto.PostLikeCountStatistics> postLikeCountStatisticsMap,
+//            Map<Long, PostDto.PostCommentCountStatistics> commentCountStatisticsMap
+//    ){}
+//
+//    public PostStatisticsInternal queryPostStatistics(PostDto.PostsBulkRequest request){
+//        Map<Long, PostDto.PostLikeCountStatistics> postLikeCountStatisticsMap = postLikeMongoRepository.countLikesByPostPks(request.getIds())
+//                .stream().map(postMapper::toPostLikeStatistics)
+//                .collect(Collectors.toMap(o -> o.getPostPk(), o -> o));
+//
+//        Map<Long, PostDto.PostCommentCountStatistics> commentCountStatisticsMap = commentMongoRepository.countCommentsByPostPks(request.getIds())
+//                .stream().map(postMapper::toPostCommentCountStatistics)
+//                .collect(Collectors.toMap(o -> o.getPostPk(), o -> o));
+//
+//        return new PostStatisticsInternal(postLikeCountStatisticsMap, commentCountStatisticsMap);
+//    }
 
     // 게시글 작성
     public PostDto.Post createPost(MemberDto.Member author, PostDto.CreatePostRequest request, String token, HttpServletResponse response) {
@@ -112,7 +97,7 @@ public class PostService {
         publishPostActivity(authorId, savedPost.getId(), PostActivityType.CREATE);
 
         // return
-        return postMapper.toPostDto(post, memberSummary, null, null);
+        return postMapper.fromCreatedPost(post, memberSummary);
     }
 
     public void insertNewDocument(Post post){
@@ -131,8 +116,6 @@ public class PostService {
             throw new PostUpdateForbiddenException();
         }
 
-        MemberProfileDto.Summary memberSummary = memberFeignHelper.getMemberSummaryById(author.getId(), token, response);
-
         // 수정 요청 반영
         post.updatePost(request.getTitle(), request.getContent());
 
@@ -142,10 +125,7 @@ public class PostService {
         // timeline 조회를 위한 활동 기록 이벤트 발행
         publishPostActivity(author.getId(), post.getId(), PostActivityType.UPDATE);
 
-        PostStatisticsInternal postStatisticsInternal = queryPostStatistics(PostDto.PostsBulkRequest.builder().ids(Set.of(postId)).build());
-
-        // return
-        return postMapper.toPostDto(post, memberSummary, postStatisticsInternal.postLikeCountStatisticsMap().get(postId), postStatisticsInternal.commentCountStatisticsMap().get(postId));
+        return timelineFeignHelper.getPostById(post.getId(), token, response);
     }
 
     public void updateDocument(Post post){
@@ -215,40 +195,40 @@ public class PostService {
         oldDocument.softDelete();
     }
 
-    @Transactional(readOnly = true)
-    public DailyfeedPage<PostDto.Post> getMyPosts(MemberDto.Member requestedMember, Pageable pageable, String token, HttpServletResponse httpResponse) {
-        Page<Post> page = postRepository.findByAuthorIdAndNotDeleted(requestedMember.getId(), pageable);
-        Set<Long> postPks = page.getContent().stream().map(Post::getId).collect(Collectors.toSet());
-
-        MemberProfileDto.Summary memberSummary = memberFeignHelper.getMemberSummaryById(requestedMember.getId(), token, httpResponse);
-
-        PostStatisticsInternal statistics = queryPostStatistics(PostDto.PostsBulkRequest.builder().ids(postPks).build());
-        Map<Long, PostDto.PostLikeCountStatistics> postLikeCountStatisticsMap = statistics.postLikeCountStatisticsMap();
-        Map<Long, PostDto.PostCommentCountStatistics> commentCountStatisticsMap = statistics.commentCountStatisticsMap();
-
-        List<PostDto.Post> content = page.getContent().stream().map(p -> postMapper.toPostDto(p, memberSummary, postLikeCountStatisticsMap.get(p.getId()), commentCountStatisticsMap.get(p.getId()))).toList();
-        return pageMapper.fromJpaPageToDailyfeedPage(page, content);
-    }
+//    @Transactional(readOnly = true)
+//    public DailyfeedPage<PostDto.Post> getMyPosts(MemberDto.Member requestedMember, Pageable pageable, String token, HttpServletResponse httpResponse) {
+//        Page<Post> page = postRepository.findByAuthorIdAndNotDeleted(requestedMember.getId(), pageable);
+//        Set<Long> postPks = page.getContent().stream().map(Post::getId).collect(Collectors.toSet());
+//
+//        MemberProfileDto.Summary memberSummary = memberFeignHelper.getMemberSummaryById(requestedMember.getId(), token, httpResponse);
+//
+//        PostStatisticsInternal statistics = queryPostStatistics(PostDto.PostsBulkRequest.builder().ids(postPks).build());
+//        Map<Long, PostDto.PostLikeCountStatistics> postLikeCountStatisticsMap = statistics.postLikeCountStatisticsMap();
+//        Map<Long, PostDto.PostCommentCountStatistics> commentCountStatisticsMap = statistics.commentCountStatisticsMap();
+//
+//        List<PostDto.Post> content = page.getContent().stream().map(p -> postMapper.toPostDto(p, memberSummary, postLikeCountStatisticsMap.get(p.getId()), commentCountStatisticsMap.get(p.getId()))).toList();
+//        return pageMapper.fromJpaPageToDailyfeedPage(page, content);
+//    }
 
     // 게시글 상세 조회 (조회수 증가)
-    @Transactional(readOnly = true)
-    @Cacheable(value = RedisKeyConstant.PostService.WEB_GET_POST_BY_ID, key = "#postId", cacheManager = "redisCacheManager")
-    public PostDto.Post getPostById(MemberDto.Member member, Long postId, String token, HttpServletResponse response) {
-        Post post = postRepository.findByIdAndNotDeleted(postId)
-                .orElseThrow(PostNotFoundException::new);
-
-        // 조회수 증가 (카프카 기반으로 변경 예정 todo)
-        post.incrementViewCount();
-
-        // 작성자 정보 조회
-        MemberProfileDto.Summary authorSummary = memberFeignHelper.getMemberSummaryById(post.getAuthorId(), token, response);
-
-        PostStatisticsInternal statistics = queryPostStatistics(PostDto.PostsBulkRequest.builder().ids(Set.of(postId)).build());
-        Map<Long, PostDto.PostLikeCountStatistics> postLikeCountStatisticsMap = statistics.postLikeCountStatisticsMap();
-        Map<Long, PostDto.PostCommentCountStatistics> commentCountStatisticsMap = statistics.commentCountStatisticsMap();
-
-        return postMapper.toPostDto(post, authorSummary, postLikeCountStatisticsMap.get(postId), commentCountStatisticsMap.get(postId));
-    }
+//    @Transactional(readOnly = true)
+//    @Cacheable(value = RedisKeyConstant.PostService.WEB_GET_POST_BY_ID, key = "#postId", cacheManager = "redisCacheManager")
+//    public PostDto.Post getPostById(MemberDto.Member member, Long postId, String token, HttpServletResponse response) {
+//        Post post = postRepository.findByIdAndNotDeleted(postId)
+//                .orElseThrow(PostNotFoundException::new);
+//
+//        // 조회수 증가 (카프카 기반으로 변경 예정 todo)
+//        post.incrementViewCount();
+//
+//        // 작성자 정보 조회
+//        MemberProfileDto.Summary authorSummary = memberFeignHelper.getMemberSummaryById(post.getAuthorId(), token, response);
+//
+//        PostStatisticsInternal statistics = queryPostStatistics(PostDto.PostsBulkRequest.builder().ids(Set.of(postId)).build());
+//        Map<Long, PostDto.PostLikeCountStatistics> postLikeCountStatisticsMap = statistics.postLikeCountStatisticsMap();
+//        Map<Long, PostDto.PostCommentCountStatistics> commentCountStatisticsMap = statistics.commentCountStatisticsMap();
+//
+//        return postMapper.toPostDto(post, authorSummary, postLikeCountStatisticsMap.get(postId), commentCountStatisticsMap.get(postId));
+//    }
 
     // 게시글 좋아요 증가
     public Boolean incrementLikeCount(Long postId) {
@@ -273,57 +253,57 @@ public class PostService {
     }
 
     // 작성자별 게시글 목록 조회
-    @Transactional(readOnly = true)
-    @Cacheable(value = RedisKeyConstant.PostService.WEB_GET_POSTS_BY_AUTHOR, key = "#authorId+'__page:'+#pageable.getPageNumber()+'_size:'+#pageable.getPageSize()", cacheManager = "redisCacheManager")
-    public DailyfeedPage<PostDto.Post> getPostsByAuthor(Long authorId, Pageable pageable, String token, HttpServletResponse httpResponse) {
-        MemberDto.Member author = memberFeignHelper.getMemberById(authorId, token, httpResponse);
-        if (author == null) {
-            throw new MemberNotFoundException(() -> "삭제된 사용자입니다");
-        }
-
-        Page<Post> posts = postRepository.findByAuthorIdAndNotDeleted(author.getId(), pageable);
-        return pageMapper.fromJpaPageToDailyfeedPage(posts, mergeAuthorAndCommentCount(posts.getContent(), token, httpResponse));
-    }
+//    @Transactional(readOnly = true)
+//    @Cacheable(value = RedisKeyConstant.PostService.WEB_GET_POSTS_BY_AUTHOR, key = "#authorId+'__page:'+#pageable.getPageNumber()+'_size:'+#pageable.getPageSize()", cacheManager = "redisCacheManager")
+//    public DailyfeedPage<PostDto.Post> getPostsByAuthor(Long authorId, Pageable pageable, String token, HttpServletResponse httpResponse) {
+//        MemberDto.Member author = memberFeignHelper.getMemberById(authorId, token, httpResponse);
+//        if (author == null) {
+//            throw new MemberNotFoundException(() -> "삭제된 사용자입니다");
+//        }
+//
+//        Page<Post> posts = postRepository.findByAuthorIdAndNotDeleted(author.getId(), pageable);
+//        return pageMapper.fromJpaPageToDailyfeedPage(posts, mergeAuthorAndCommentCount(posts.getContent(), token, httpResponse));
+//    }
 
     // 게시글 검색
-    @Transactional(readOnly = true)
-    @Cacheable(value = RedisKeyConstant.PostService.WEB_SEARCH_SEARCH_POSTS, key = "#keyword+'__page:'+#page+'_size:'+#size", cacheManager = "redisCacheManager")
-    public DailyfeedPage<PostDto.Post> searchPosts(String keyword, int page, int size, String token, HttpServletResponse httpResponse) {
-        log.info("Searching posts with keyword: {}", keyword);
+//    @Transactional(readOnly = true)
+//    @Cacheable(value = RedisKeyConstant.PostService.WEB_SEARCH_SEARCH_POSTS, key = "#keyword+'__page:'+#page+'_size:'+#size", cacheManager = "redisCacheManager")
+//    public DailyfeedPage<PostDto.Post> searchPosts(String keyword, int page, int size, String token, HttpServletResponse httpResponse) {
+//        log.info("Searching posts with keyword: {}", keyword);
+//
+//        Pageable pageable = PageRequest.of(page, size);
+//        Page<Post> posts = postRepository.findByTitleOrContentContainingAndNotDeleted(keyword, pageable);
+//
+//        return pageMapper.fromJpaPageToDailyfeedPage(posts, mergeAuthorAndCommentCount(posts.getContent(), token, httpResponse));
+//    }
 
-        Pageable pageable = PageRequest.of(page, size);
-        Page<Post> posts = postRepository.findByTitleOrContentContainingAndNotDeleted(keyword, pageable);
+//    public List<PostDto.Post> mergeAuthorAndCommentCount(List<Post> posts, String token, HttpServletResponse httpResponse){
+//        // (1) 작성자 id 추출
+//        Set<Long> authorIds = posts.stream()
+//                .map(Post::getAuthorId)
+//                .collect(Collectors.toSet());
+//
+//        // (2) 작성자 상세 정보
+//        Map<Long, MemberProfileDto.Summary> authorsMap = memberFeignHelper.getMemberMap(authorIds, token, httpResponse);
+//
+//        Set<Long> postIds = posts.stream().map(Post::getId).collect(Collectors.toSet());
+//        PostStatisticsInternal statistics = queryPostStatistics(PostDto.PostsBulkRequest.builder().ids(postIds).build());
+//
+//        return posts.stream()
+//                .map(post -> {
+//                    PostDto.PostCommentCountStatistics postCountStatistics = statistics.commentCountStatisticsMap.get(post.getId());
+//                    Long commentCounts = 0L;
+//                    if (postCountStatistics != null){
+//                        commentCounts = postCountStatistics.getCommentCount() != null ? postCountStatistics.getCommentCount() : 0L;
+//                    }
+//                    return postMapper.toPostDto(post, authorsMap.get(post.getAuthorId()), commentCounts);
+//                })
+//                .collect(Collectors.toList());
+//    }
 
-        return pageMapper.fromJpaPageToDailyfeedPage(posts, mergeAuthorAndCommentCount(posts.getContent(), token, httpResponse));
-    }
-
-    public List<PostDto.Post> mergeAuthorAndCommentCount(List<Post> posts, String token, HttpServletResponse httpResponse){
-        // (1) 작성자 id 추출
-        Set<Long> authorIds = posts.stream()
-                .map(Post::getAuthorId)
-                .collect(Collectors.toSet());
-
-        // (2) 작성자 상세 정보
-        Map<Long, MemberProfileDto.Summary> authorsMap = memberFeignHelper.getMemberMap(authorIds, token, httpResponse);
-
-        Set<Long> postIds = posts.stream().map(Post::getId).collect(Collectors.toSet());
-        PostStatisticsInternal statistics = queryPostStatistics(PostDto.PostsBulkRequest.builder().ids(postIds).build());
-
-        return posts.stream()
-                .map(post -> {
-                    PostDto.PostCommentCountStatistics postCountStatistics = statistics.commentCountStatisticsMap.get(post.getId());
-                    Long commentCounts = 0L;
-                    if (postCountStatistics != null){
-                        commentCounts = postCountStatistics.getCommentCount() != null ? postCountStatistics.getCommentCount() : 0L;
-                    }
-                    return postMapper.toPostDto(post, authorsMap.get(post.getAuthorId()), commentCounts);
-                })
-                .collect(Collectors.toList());
-    }
-
-    // 관리자용: 작성자별 게시글 일괄 삭제
-    public int deletePostsByAuthor(Long authorId) {
-        log.info("Admin deleting all posts by author: {}", authorId);
-        return postRepository.softDeleteByAuthorId(authorId);
-    }
+//    // 관리자용: 작성자별 게시글 일괄 삭제
+//    public int deletePostsByAuthor(Long authorId) {
+//        log.info("Admin deleting all posts by author: {}", authorId);
+//        return postRepository.softDeleteByAuthorId(authorId);
+//    }
 }

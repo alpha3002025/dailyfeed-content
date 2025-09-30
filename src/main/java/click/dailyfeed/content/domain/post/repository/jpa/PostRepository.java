@@ -25,13 +25,6 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     @Query("SELECT p FROM Post p WHERE p.isDeleted = false ORDER BY p.createdAt DESC")
     Page<Post> findAllNotDeletedOrderByCreatedDateDesc(Pageable pageable);
 
-    @Query("SELECT p FROM Post p WHERE p.isDeleted = false and p.id in :ids ORDER BY p.createdAt DESC")
-    List<Post> findPostsByIdsInNotDeletedOrderByCreatedDateDesc(Set<Long> ids);
-
-    // 특정 사용자의 게시글 조회
-    @Query("SELECT p FROM Post p WHERE p.authorId = :authorId AND p.isDeleted = false ORDER BY p.createdAt DESC")
-    Page<Post> findByAuthorIdAndNotDeleted(@Param("authorId") Long authorId, Pageable pageable);
-
     // 제목으로 검색
     @Query("SELECT p FROM Post p WHERE p.title LIKE %:keyword% AND p.isDeleted = false ORDER BY p.createdAt DESC")
     Page<Post> findByTitleContainingAndNotDeleted(@Param("keyword") String keyword, Pageable pageable);

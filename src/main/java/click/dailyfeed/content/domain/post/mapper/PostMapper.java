@@ -9,6 +9,23 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class PostMapper {
+    public PostDto.Post fromCreatedPost(Post post, MemberProfileDto.Summary author){
+        return PostDto.Post.builder()
+                .id(post.getId())
+                .title(post.getTitle())
+                .content(post.getContent())
+                .authorId(author != null ? author.getId() : null)
+                .authorName(author != null ? author.getDisplayName() : null)
+                .authorHandle(author != null ? author.getMemberHandle() : null)
+                .authorAvatarUrl(author != null ? author.getAvatarUrl() : null)
+                .viewCount(post.getViewCount())
+                .likeCount(0L)
+                .commentCount(0L)
+                .createdAt(post.getCreatedAt())
+                .updatedAt(post.getUpdatedAt())
+                .build();
+    }
+
     public PostDto.Post toPostDto(Post post, MemberProfileDto.Summary author, PostDto.PostLikeCountStatistics postLikeStatistics, PostDto.PostCommentCountStatistics commentCountStatistics) {
         return PostDto.Post.builder()
                 .id(post.getId())
@@ -26,21 +43,21 @@ public class PostMapper {
                 .build();
     }
 
-    public PostDto.Post toPostDto(Post post, MemberProfileDto.Summary author, Long commentCount){
-        return PostDto.Post.builder()
-                .id(post.getId())
-                .title(post.getTitle())
-                .content(post.getContent())
-                .authorId(author.getId())
-                .authorName(author.getDisplayName())
-                .authorHandle(author.getMemberHandle())
-                .viewCount(post.getViewCount())
-                .likeCount(post.getLikeCount())
-                .commentCount(commentCount)
-                .createdAt(post.getCreatedAt())
-                .updatedAt(post.getUpdatedAt())
-                .build();
-    }
+//    public PostDto.Post toPostDto(Post post, MemberProfileDto.Summary author, Long commentCount){
+//        return PostDto.Post.builder()
+//                .id(post.getId())
+//                .title(post.getTitle())
+//                .content(post.getContent())
+//                .authorId(author.getId())
+//                .authorName(author.getDisplayName())
+//                .authorHandle(author.getMemberHandle())
+//                .viewCount(post.getViewCount())
+//                .likeCount(post.getLikeCount())
+//                .commentCount(commentCount)
+//                .createdAt(post.getCreatedAt())
+//                .updatedAt(post.getUpdatedAt())
+//                .build();
+//    }
 
     /// 본문 좋아요 카운트 객체 변환
     public PostDto.PostLikeCountStatistics toPostLikeStatistics(PostLikeCountProjection postLikeCountProjection) {
