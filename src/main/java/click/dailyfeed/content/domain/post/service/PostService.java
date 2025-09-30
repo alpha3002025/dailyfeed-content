@@ -71,7 +71,7 @@ public class PostService {
                 .stream()
                 .collect(Collectors.toMap(s -> s.getMemberId(), s -> s));
 
-        PostStatisticsInternal statistics = postStatisticsCount(request);
+        PostStatisticsInternal statistics = queryPostStatistics(request);
         Map<Long, PostDto.PostLikeCountStatistics> postLikeCountStatisticsMap = statistics.postLikeCountStatisticsMap();
         Map<Long, PostDto.PostCommentCountStatistics> commentCountStatisticsMap = statistics.commentCountStatisticsMap();
 
@@ -83,7 +83,7 @@ public class PostService {
             Map<Long, PostDto.PostCommentCountStatistics> commentCountStatisticsMap
     ){}
 
-    public PostStatisticsInternal postStatisticsCount(PostDto.PostsBulkRequest request){
+    public PostStatisticsInternal queryPostStatistics(PostDto.PostsBulkRequest request){
         Map<Long, PostDto.PostLikeCountStatistics> postLikeCountStatisticsMap = postLikeMongoRepository.countLikesByPostPks(request.getIds())
                 .stream().map(postMapper::toPostLikeStatistics)
                 .collect(Collectors.toMap(o -> o.getPostPk(), o -> o));
@@ -142,7 +142,7 @@ public class PostService {
         // timeline 조회를 위한 활동 기록 이벤트 발행
         publishPostActivity(author.getId(), post.getId(), PostActivityType.UPDATE);
 
-        PostStatisticsInternal postStatisticsInternal = postStatisticsCount(PostDto.PostsBulkRequest.builder().ids(Set.of(postId)).build());
+        PostStatisticsInternal postStatisticsInternal = queryPostStatistics(PostDto.PostsBulkRequest.builder().ids(Set.of(postId)).build());
 
         // return
         return postMapper.toPostDto(post, memberSummary, postStatisticsInternal.postLikeCountStatisticsMap().get(postId), postStatisticsInternal.commentCountStatisticsMap().get(postId));
@@ -222,7 +222,7 @@ public class PostService {
 
         MemberProfileDto.Summary memberSummary = memberFeignHelper.getMemberSummaryById(requestedMember.getId(), token, httpResponse);
 
-        PostStatisticsInternal statistics = postStatisticsCount(PostDto.PostsBulkRequest.builder().ids(postPks).build());
+        PostStatisticsInternal statistics = queryPostStatistics(PostDto.PostsBulkRequest.builder().ids(postPks).build());
         Map<Long, PostDto.PostLikeCountStatistics> postLikeCountStatisticsMap = statistics.postLikeCountStatisticsMap();
         Map<Long, PostDto.PostCommentCountStatistics> commentCountStatisticsMap = statistics.commentCountStatisticsMap();
 
@@ -243,7 +243,7 @@ public class PostService {
         // 작성자 정보 조회
         MemberProfileDto.Summary authorSummary = memberFeignHelper.getMemberSummaryById(post.getAuthorId(), token, response);
 
-        PostStatisticsInternal statistics = postStatisticsCount(PostDto.PostsBulkRequest.builder().ids(Set.of(postId)).build());
+        PostStatisticsInternal statistics = queryPostStatistics(PostDto.PostsBulkRequest.builder().ids(Set.of(postId)).build());
         Map<Long, PostDto.PostLikeCountStatistics> postLikeCountStatisticsMap = statistics.postLikeCountStatisticsMap();
         Map<Long, PostDto.PostCommentCountStatistics> commentCountStatisticsMap = statistics.commentCountStatisticsMap();
 
@@ -307,7 +307,7 @@ public class PostService {
         Map<Long, MemberProfileDto.Summary> authorsMap = memberFeignHelper.getMemberMap(authorIds, token, httpResponse);
 
         Set<Long> postIds = posts.stream().map(Post::getId).collect(Collectors.toSet());
-        PostStatisticsInternal statistics = postStatisticsCount(PostDto.PostsBulkRequest.builder().ids(postIds).build());
+        PostStatisticsInternal statistics = queryPostStatistics(PostDto.PostsBulkRequest.builder().ids(postIds).build());
 
         return posts.stream()
                 .map(post -> {
