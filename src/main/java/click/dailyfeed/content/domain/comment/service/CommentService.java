@@ -144,11 +144,10 @@ public class CommentService {
     public void updateDocument(Comment comment){
         CommentDocument oldDocument = commentMongoRepository
                 .findByCommentPkAndIsDeleted(comment.getId(), Boolean.FALSE)
-                .orElseThrow(click.dailyfeed.code.domain.content.post.exception.PostNotFoundException::new);
+                .orElseThrow(CommentNotFoundException::new);
 
-        oldDocument.softDelete();
         CommentDocument updatedPost = CommentDocument.newUpdatedPost(oldDocument, comment.getUpdatedAt());
-
+        commentMongoRepository.delete(oldDocument);
         commentMongoRepository.save(updatedPost);
     }
 
@@ -166,11 +165,21 @@ public class CommentService {
 
         // 댓글과 모든 자식 댓글들을 소프트 삭제 (TODO : Season2)
         commentRepository.softDeleteCommentAndChildren(commentId);
+        deleteDocument(comment);
 
         // timeline 을 위한 활동 기록
         publishCommentActivity(requestedMember.getId(), commentId, CommentActivityType.SOFT_DELETE);
 
         return Boolean.TRUE;
+    }
+
+
+    // 본문 검색 용도의 컬렉션 'comments' 에 저장
+    public void deleteDocument(Comment comment){
+        CommentDocument document = commentMongoRepository
+                .findByCommentPkAndIsDeleted(comment.getId(), Boolean.FALSE)
+                .orElseThrow(CommentNotFoundException::new);
+        commentMongoRepository.delete(document);
     }
 
 //    // 특정 게시글의 댓글 목록 조회 (계층구조)

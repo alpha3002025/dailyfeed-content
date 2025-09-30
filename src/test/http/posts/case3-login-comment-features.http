@@ -61,7 +61,7 @@ Content-Type: application/json
 %}
 
 ###############################################################################
-### 2. 댓글 작성
+### 2. 댓글 작성/수정/삭제
 ###############################################################################
 @case2Path = /api/comments
 
@@ -75,6 +75,22 @@ Content-Type: application/json
   "postId": 3,
   "parentId": null
 }
+
+### 2.2. 댓글 수정
+@case2_2Path = /api/comments/1
+PUT {{baseUrl}}{{case2_2Path}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "content": "글 정말 재밌게 잘 읽었습니다4567"
+}
+
+### 2.3. 댓글 삭제
+@case2_3Path = /api/comments/1
+DELETE {{baseUrl}}{{case2_3Path}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
 
 
 ### etc. 사용자 조회
