@@ -55,9 +55,7 @@ public class PostService {
     private final PostEventMapper postEventMapper;
     private final PageMapper pageMapper;
     private final MemberFeignHelper memberFeignHelper;
-    private final PostFeignHelper postFeignHelper;
     private final KafkaHelper kafkaHelper;
-    private final DatePeriodBasedPageKeyGenerator datePeriodBasedPageKeyGenerator;
 
     // 특정 post id 리스트에 해당하는 post 리스트 조회
     @Cacheable(value = RedisKeyConstant.PostService.INTERNAL_LIST_GET_POST_LIST_BY_IDS_IN, keyGenerator = "postIdsKeyGenerator", cacheManager = "redisCacheManager")
