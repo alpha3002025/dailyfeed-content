@@ -2,9 +2,7 @@ package click.dailyfeed.content.domain.post.mapper;
 
 import click.dailyfeed.code.domain.content.post.dto.PostDto;
 import click.dailyfeed.code.domain.member.member.dto.MemberProfileDto;
-import click.dailyfeed.content.domain.comment.projection.PostCommentCountProjection;
 import click.dailyfeed.content.domain.post.entity.Post;
-import click.dailyfeed.content.domain.post.projection.PostLikeCountProjection;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -59,19 +57,4 @@ public class PostMapper {
 //                .build();
 //    }
 
-    /// 본문 좋아요 카운트 객체 변환
-    public PostDto.PostLikeCountStatistics toPostLikeStatistics(PostLikeCountProjection postLikeCountProjection) {
-        return PostDto.PostLikeCountStatistics.builder()
-                .postPk(postLikeCountProjection.getPostPk())
-                .likeCount(postLikeCountProjection.getLikeCount())
-                .build();
-    }
-
-    /// 본문 댓글 수 카운트 객체 변환
-    public PostDto.PostCommentCountStatistics toPostCommentCountStatistics(PostCommentCountProjection postCommentCountProjection) {
-        return PostDto.PostCommentCountStatistics.builder()
-                .postPk(postCommentCountProjection.getPostPk())
-                .commentCount(postCommentCountProjection.getCommentCount())
-                .build();
-    }
 }
