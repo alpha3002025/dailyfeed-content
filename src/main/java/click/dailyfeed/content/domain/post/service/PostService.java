@@ -8,6 +8,7 @@ import click.dailyfeed.code.domain.content.post.type.PostActivityType;
 import click.dailyfeed.code.domain.content.post.type.PostLikeType;
 import click.dailyfeed.code.domain.member.member.dto.MemberDto;
 import click.dailyfeed.code.domain.member.member.dto.MemberProfileDto;
+import click.dailyfeed.code.domain.timeline.statistics.TimelineStatisticsDto;
 import click.dailyfeed.code.global.kafka.exception.KafkaNetworkErrorException;
 import click.dailyfeed.code.global.kafka.type.DateBasedTopicType;
 import click.dailyfeed.content.domain.post.document.PostDocument;
@@ -16,7 +17,6 @@ import click.dailyfeed.content.domain.post.mapper.PostEventMapper;
 import click.dailyfeed.content.domain.post.mapper.PostMapper;
 import click.dailyfeed.content.domain.post.repository.jpa.PostRepository;
 import click.dailyfeed.content.domain.post.repository.mongo.PostMongoRepository;
-import click.dailyfeed.feign.domain.member.MemberFeignHelper;
 import click.dailyfeed.feign.domain.timeline.TimelineFeignHelper;
 import click.dailyfeed.kafka.domain.kafka.service.KafkaHelper;
 import jakarta.servlet.http.HttpServletResponse;
@@ -36,7 +36,6 @@ public class PostService {
     private final PostMongoRepository postMongoRepository;
     private final PostMapper postMapper;
     private final PostEventMapper postEventMapper;
-    private final MemberFeignHelper memberFeignHelper;
     private final TimelineFeignHelper timelineFeignHelper;
     private final KafkaHelper kafkaHelper;
 
@@ -81,10 +80,9 @@ public class PostService {
 //    }
 
     // 게시글 작성
-    public PostDto.Post createPost(MemberDto.Member author, PostDto.CreatePostRequest request, String token, HttpServletResponse response) {
+    public PostDto.Post createPost(MemberProfileDto.Summary author, PostDto.CreatePostRequest request, String token, HttpServletResponse response) {
         // 작성자 정보 확인
         Long authorId = author.getId();
-        MemberProfileDto.Summary memberSummary = memberFeignHelper.getMemberSummaryById(authorId, token, response);
 
         // 본문 저장 (제목 기능을 그대로 둘지 아직 결정을 못해서 일단은 첫 문장만 떼어두기로 (요약 등..))
         Post post = Post.newPost("", request.getContent(), authorId);
@@ -93,11 +91,11 @@ public class PostService {
         // mongodb 에 본문 내용 저장
         insertNewDocument(savedPost);
 
-        // timeline 조회를 위한 활동 기록 이벤트 발행
+        // timeline 조회를 위한 활동 기록 이벤트 발행  TODO :: feat/member/member-activity-logger-v1-0001
         publishPostActivity(authorId, savedPost.getId(), PostActivityType.CREATE);
 
         // return
-        return postMapper.fromCreatedPost(post, memberSummary);
+        return postMapper.fromCreatedPost(post, author);
     }
 
     public void insertNewDocument(Post post){
@@ -107,7 +105,7 @@ public class PostService {
     }
 
     // 게시글 수정
-    public PostDto.Post updatePost(MemberDto.Member author, Long postId, PostDto.UpdatePostRequest request, String token, HttpServletResponse response) {
+    public PostDto.Post updatePost(MemberProfileDto.Summary author, Long postId, PostDto.UpdatePostRequest request, String token, HttpServletResponse response) {
         Post post = postRepository.findByIdAndNotDeleted(postId)
                 .orElseThrow(PostNotFoundException::new);
 
@@ -122,10 +120,12 @@ public class PostService {
         // mongodb에 본문 내용 저장
         updateDocument(post);
 
-        // timeline 조회를 위한 활동 기록 이벤트 발행
+        // timeline 조회를 위한 활동 기록 이벤트 발행 TODO :: feat/member/member-activity-logger-v1-0001
         publishPostActivity(author.getId(), post.getId(), PostActivityType.UPDATE);
 
-        return timelineFeignHelper.getPostById(post.getId(), token, response);
+        TimelineStatisticsDto.PostItemCounts postItemCounts = timelineFeignHelper.getPostItemCounts(post.getId(), token, response);
+
+        return postMapper.fromUpdatedPost(post, author, postItemCounts);
     }
 
     public void updateDocument(Post post){

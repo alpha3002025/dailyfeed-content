@@ -91,10 +91,10 @@ public class CommentService {
         Comment savedComment = commentRepository.save(comment);
 
         // 응답 생성 및 작성자 정보 추가
-        CommentDto.Comment commentDto = commentMapper.toCommentNonRecursive(savedComment, member);
+        CommentDto.Comment commentDto = commentMapper.fromCommentNonRecursive(savedComment, member);
         mergeAuthorAtComment(commentDto, member);
 
-        // timeline 을 위한 활동 기록
+        // timeline 을 위한 활동 기록 (TODO :: feat/member/member-event-logger-v1-0001)
         publishCommentActivity(member.getId(), savedComment.getId(), CommentActivityType.CREATE);
 
         // mongodb 에 본문 저장 (Season2 개발 예정)
@@ -134,7 +134,7 @@ public class CommentService {
 
         // TODO timelineFeignHelper 에서 조회
         // 응답 생성 및 작성자 정보 추가
-        CommentDto.Comment commentUpdated = commentMapper.toCommentNonRecursive(updatedComment, author);
+        CommentDto.Comment commentUpdated = commentMapper.fromCommentNonRecursive(updatedComment, author);
 //        mergeAuthorAtCommentList(List.of(commentUpdated), token, httpResponse);
 
         return commentUpdated;

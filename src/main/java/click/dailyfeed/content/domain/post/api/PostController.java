@@ -2,10 +2,12 @@ package click.dailyfeed.content.domain.post.api;
 
 import click.dailyfeed.code.domain.content.post.dto.PostDto;
 import click.dailyfeed.code.domain.member.member.dto.MemberDto;
+import click.dailyfeed.code.domain.member.member.dto.MemberProfileDto;
 import click.dailyfeed.code.global.web.code.ResponseSuccessCode;
 import click.dailyfeed.code.global.web.response.DailyfeedServerResponse;
 import click.dailyfeed.content.domain.post.service.PostService;
 import click.dailyfeed.feign.config.web.annotation.AuthenticatedMember;
+import click.dailyfeed.feign.config.web.annotation.AuthenticatedMemberProfileSummary;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -26,7 +28,7 @@ public class PostController {
     @Operation(summary = "게시글 작성", description = "새로운 게시글을 작성합니다.")
     @PostMapping
     public DailyfeedServerResponse<PostDto.Post> createPost(
-            @AuthenticatedMember MemberDto.Member member,
+            @AuthenticatedMemberProfileSummary MemberProfileDto.Summary member,
             @Valid @RequestBody PostDto.CreatePostRequest request,
             @RequestHeader(value = "Authorization", required = false) String token,
             HttpServletResponse response ) {
@@ -43,7 +45,7 @@ public class PostController {
     @Operation(summary = "게시글 수정", description = "기존 게시글을 수정합니다.")
     @PutMapping("/{postId}")
     public DailyfeedServerResponse<PostDto.Post> updatePost(
-            @AuthenticatedMember MemberDto.Member member,
+            @AuthenticatedMemberProfileSummary MemberProfileDto.Summary member,
             @RequestHeader(value = "Authorization", required = false) String token,
             HttpServletResponse httpResponse,
             @PathVariable Long postId,

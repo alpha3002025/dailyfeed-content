@@ -10,7 +10,7 @@ import java.util.ArrayList;
 @Component
 public class CommentMapper {
 
-    public CommentDto.Comment toCommentNonRecursive(Comment comment){
+    public CommentDto.Comment fromCommentNonRecursive(Comment comment){
         return CommentDto.Comment.builder()
                 .id(comment.getId())
                 .content(comment.getContent())
@@ -19,12 +19,14 @@ public class CommentMapper {
                 .parentId(comment.getParent() != null ? comment.getParent().getId() : null)
                 .depth(comment.getDepth())
                 .children(comment.getChildren().stream()
-                        .map(this::toCommentNonRecursive)
+                        .map(this::fromCommentNonRecursive)
                         .toList())
                 .createdAt(comment.getCreatedAt())
                 .updatedAt(comment.getUpdatedAt())
                 .build();
     }
+
+
 
     // 순환 참조를 방지하기 위한 오버로드된 메서드
     public CommentDto.Comment toCommentWith(Comment comment, boolean includeChildren) {
@@ -50,7 +52,7 @@ public class CommentMapper {
     }
 
 
-    public CommentDto.Comment toCommentNonRecursive(Comment comment, MemberProfileDto.Summary author){
+    public CommentDto.Comment fromCommentNonRecursive(Comment comment, MemberProfileDto.Summary author){
         return CommentDto.Comment.builder()
                 .id(comment.getId())
                 .content(comment.getContent())
@@ -62,7 +64,7 @@ public class CommentMapper {
                 .parentId(comment.getParent() != null ? comment.getParent().getId() : null)
                 .depth(comment.getDepth())
                 .children(comment.getChildren().stream()
-                        .map(this::toCommentNonRecursive)
+                        .map(this::fromCommentNonRecursive)
                         .toList())
                 .createdAt(comment.getCreatedAt())
                 .updatedAt(comment.getUpdatedAt())
