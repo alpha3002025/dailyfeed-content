@@ -137,6 +137,7 @@ public class PostService {
                 .orElseThrow(PostNotFoundException::new);
 
         oldDocument.softDelete();
+        postMongoRepository.save(oldDocument);
         PostDocument updatedPost = PostDocument.newUpdatedPost(oldDocument, post.getUpdatedAt());
 
         postMongoRepository.save(updatedPost);
