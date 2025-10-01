@@ -1,9 +1,7 @@
 package click.dailyfeed.content.domain.post.service;
 
 import click.dailyfeed.code.domain.content.post.dto.PostDto;
-import click.dailyfeed.code.domain.content.post.exception.PostDeleteForbiddenException;
-import click.dailyfeed.code.domain.content.post.exception.PostNotFoundException;
-import click.dailyfeed.code.domain.content.post.exception.PostUpdateForbiddenException;
+import click.dailyfeed.code.domain.content.post.exception.*;
 import click.dailyfeed.code.domain.content.post.type.PostActivityType;
 import click.dailyfeed.code.domain.content.post.type.PostLikeType;
 import click.dailyfeed.code.domain.member.member.dto.MemberDto;
@@ -165,6 +163,11 @@ public class PostService {
         Post post = postRepository.findByIdAndNotDeleted(postId)
                 .orElseThrow(PostNotFoundException::new);
 
+        PostLikeDocument existDocument = postLikeMongoRepository.findByPostPkAndMemberId(post.getId(), member.getId());
+        if (existDocument != null) {
+            throw new PostLikeAlreadyExistsException();
+        }
+
         PostLikeDocument postLikeDocument = PostLikeDocument.newPostLikeBuilder()
                 .postPk(post.getId())
                 .memberId(member.getId())
@@ -179,6 +182,11 @@ public class PostService {
         // 게시글 존재 확인
         Post post = postRepository.findByIdAndNotDeleted(postId)
                 .orElseThrow(PostNotFoundException::new);
+
+        PostLikeDocument existDocument = postLikeMongoRepository.findByPostPkAndMemberId(post.getId(), member.getId());
+        if (existDocument == null) {
+            throw new PostLikeCancelAlreadyCommittedException();
+        }
 
         PostLikeDocument postLikeDocument = postLikeMongoRepository.findByPostPkAndMemberId(post.getId(), member.getId());
         postLikeMongoRepository.deleteById(postLikeDocument.getId());
