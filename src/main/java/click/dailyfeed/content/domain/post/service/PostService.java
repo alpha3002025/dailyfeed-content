@@ -12,10 +12,12 @@ import click.dailyfeed.code.domain.timeline.statistics.TimelineStatisticsDto;
 import click.dailyfeed.code.global.kafka.exception.KafkaNetworkErrorException;
 import click.dailyfeed.code.global.kafka.type.DateBasedTopicType;
 import click.dailyfeed.content.domain.post.document.PostDocument;
+import click.dailyfeed.content.domain.post.document.PostLikeDocument;
 import click.dailyfeed.content.domain.post.entity.Post;
 import click.dailyfeed.content.domain.post.mapper.PostEventMapper;
 import click.dailyfeed.content.domain.post.mapper.PostMapper;
 import click.dailyfeed.content.domain.post.repository.jpa.PostRepository;
+import click.dailyfeed.content.domain.post.repository.mongo.PostLikeMongoRepository;
 import click.dailyfeed.content.domain.post.repository.mongo.PostMongoRepository;
 import click.dailyfeed.feign.domain.timeline.TimelineFeignHelper;
 import click.dailyfeed.kafka.domain.kafka.service.KafkaHelper;
@@ -34,6 +36,7 @@ import java.time.LocalDateTime;
 public class PostService {
     private final PostRepository postRepository;
     private final PostMongoRepository postMongoRepository;
+    private final PostLikeMongoRepository postLikeMongoRepository;
     private final PostMapper postMapper;
     private final PostEventMapper postEventMapper;
     private final TimelineFeignHelper timelineFeignHelper;
@@ -231,23 +234,28 @@ public class PostService {
 //    }
 
     // 게시글 좋아요 증가
-    public Boolean incrementLikeCount(Long postId) {
+    public Boolean incrementLikeCount(Long postId, MemberDto.Member member) {
         // 게시글 존재 확인
         Post post = postRepository.findByIdAndNotDeleted(postId)
                 .orElseThrow(PostNotFoundException::new);
 
-        post.incrementLikeCount();
+        PostLikeDocument postLikeDocument = PostLikeDocument.newPostLikeBuilder()
+                .postPk(post.getId())
+                .memberId(member.getId())
+                .build();
 
+        postLikeMongoRepository.save(postLikeDocument);
         return Boolean.TRUE;
     }
 
     // 게시글 좋아요 감소
-    public Boolean decrementLikeCount(Long postId) {
+    public Boolean decrementLikeCount(Long postId, MemberDto.Member member) {
         // 게시글 존재 확인
         Post post = postRepository.findByIdAndNotDeleted(postId)
                 .orElseThrow(PostNotFoundException::new);
 
-        post.decrementLikeCount();
+        PostLikeDocument postLikeDocument = postLikeMongoRepository.findByPostPkAndMemberId(post.getId(), member.getId());
+        postLikeMongoRepository.deleteById(postLikeDocument.getId());
 
         return Boolean.TRUE;
     }

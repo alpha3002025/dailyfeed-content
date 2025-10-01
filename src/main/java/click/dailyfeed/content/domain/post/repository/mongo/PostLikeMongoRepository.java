@@ -16,6 +16,8 @@ public interface PostLikeMongoRepository extends MongoRepository<PostLikeDocumen
 //    @Query(value = "{}", count = true)
 //    long countAllPostLikes();
 
+    PostLikeDocument findByPostPkAndMemberId(Long postPk, Long memberId);
+
     // 특정 포스트의 좋아요 수 카운트
     @Query(value = "{ 'post_pk': ?0 }", count = true)
     long countByPostPk(Long postPk);

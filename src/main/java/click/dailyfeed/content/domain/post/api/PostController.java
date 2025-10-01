@@ -120,7 +120,7 @@ public class PostController {
             @PathVariable Long postId
     ) {
 
-        Boolean result = postService.incrementLikeCount(postId);
+        Boolean result = postService.incrementLikeCount(postId, member);
         return DailyfeedServerResponse.<Boolean>builder()
                 .status(HttpStatus.OK.value())
                 .result(ResponseSuccessCode.SUCCESS)
@@ -134,7 +134,7 @@ public class PostController {
             @AuthenticatedMember MemberDto.Member member,
             @PathVariable Long postId) {
 
-        Boolean result = postService.decrementLikeCount(postId);
+        Boolean result = postService.decrementLikeCount(postId, member);
         return DailyfeedServerResponse.<Boolean>builder()
                 .status(HttpStatus.OK.value())
                 .result(ResponseSuccessCode.SUCCESS)
