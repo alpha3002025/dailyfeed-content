@@ -43,7 +43,7 @@ public class CommentDocument {
         this.content = content;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
-        this.isDeleted = false;
+        this.isDeleted = Boolean.FALSE;
     }
 
     @Builder(builderMethodName = "updatedCommentBuilder", builderClassName = "UpdatedPost")
