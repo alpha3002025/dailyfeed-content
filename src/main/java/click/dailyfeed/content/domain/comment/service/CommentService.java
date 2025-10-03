@@ -1,13 +1,10 @@
 package click.dailyfeed.content.domain.comment.service;
 
+import click.dailyfeed.code.domain.activity.type.MemberActivityType;
 import click.dailyfeed.code.domain.content.comment.dto.CommentDto;
 import click.dailyfeed.code.domain.content.comment.exception.*;
-import click.dailyfeed.code.domain.content.comment.type.CommentActivityType;
-import click.dailyfeed.code.domain.content.comment.type.CommentLikeType;
 import click.dailyfeed.code.domain.member.member.dto.MemberDto;
 import click.dailyfeed.code.domain.member.member.dto.MemberProfileDto;
-import click.dailyfeed.code.global.kafka.exception.KafkaNetworkErrorException;
-import click.dailyfeed.code.global.kafka.type.DateBasedTopicType;
 import click.dailyfeed.code.global.web.page.DailyfeedPage;
 import click.dailyfeed.content.domain.comment.document.CommentDocument;
 import click.dailyfeed.content.domain.comment.entity.Comment;
@@ -18,7 +15,7 @@ import click.dailyfeed.content.domain.comment.repository.mongo.CommentMongoRepos
 import click.dailyfeed.content.domain.post.entity.Post;
 import click.dailyfeed.content.domain.post.repository.jpa.PostRepository;
 import click.dailyfeed.feign.domain.member.MemberFeignHelper;
-import click.dailyfeed.kafka.domain.kafka.service.KafkaHelper;
+import click.dailyfeed.kafka.domain.activity.publisher.MemberActivityKafkaPublisher;
 import click.dailyfeed.pagination.mapper.PageMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -27,7 +24,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -45,7 +41,7 @@ public class CommentService {
     private final CommentEventMapper commentEventMapper;
     private final PageMapper pageMapper;
     private final MemberFeignHelper memberFeignHelper;
-    private final KafkaHelper kafkaHelper;
+    private final MemberActivityKafkaPublisher memberActivityKafkaPublisher;
 
     private static final int MAX_COMMENT_DEPTH = 2; // 최대 댓글 깊이 제한
 
@@ -94,8 +90,8 @@ public class CommentService {
         CommentDto.Comment commentDto = commentMapper.fromCommentNonRecursive(savedComment, member);
         mergeAuthorAtComment(commentDto, member);
 
-        // timeline 을 위한 활동 기록 (TODO :: feat/member/member-event-logger-v1-0001)
-        publishCommentActivity(member.getId(), savedComment.getId(), CommentActivityType.CREATE);
+        // 멤버 활동 기록
+        memberActivityKafkaPublisher.publishCommentCUDEvent(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_CREATE);
 
         // mongodb 에 본문 저장 (Season2 개발 예정)
         insertNewDocument(post, savedComment);
@@ -127,7 +123,7 @@ public class CommentService {
         Comment updatedComment = commentRepository.save(comment);
 
         // timeline 을 위한 활동 기록
-        publishCommentActivity(member.getId(), updatedComment.getId(), CommentActivityType.UPDATE);
+        memberActivityKafkaPublisher.publishCommentCUDEvent(member.getId(), comment.getPost().getId(), commentId, MemberActivityType.COMMENT_UPDATE);
 
         // mongodb 에 본문 저장
         updateDocument(comment);
@@ -168,11 +164,10 @@ public class CommentService {
         deleteDocument(comment);
 
         // timeline 을 위한 활동 기록
-        publishCommentActivity(requestedMember.getId(), commentId, CommentActivityType.SOFT_DELETE);
+        memberActivityKafkaPublisher.publishCommentCUDEvent(requestedMember.getId(), comment.getPost().getId(), commentId, MemberActivityType.COMMENT_DELETE);
 
         return Boolean.TRUE;
     }
-
 
     // 본문 검색 용도의 컬렉션 'comments' 에 저장
     public void deleteDocument(Comment comment){
@@ -181,80 +176,6 @@ public class CommentService {
                 .orElseThrow(CommentNotFoundException::new);
         commentMongoRepository.delete(document);
     }
-
-//    // 특정 게시글의 댓글 목록 조회 (계층구조)
-//    @Transactional(readOnly = true)
-//    @Cacheable(value = RedisKeyConstant.CommentService.WEB_GET_COMMENTS_BY_POST_ID, key = "'postId_'+#postId+'_page_'+#pageable.getPageNumber()+'_size_'+#pageable.getPageSize()")
-//    public DailyfeedPage<CommentDto.Comment> getCommentsByPost(Long postId, Pageable pageable, String token, HttpServletResponse httpResponse) {
-//        Post post = getPostByIdOrThrow(postId);
-//
-//        Page<Comment> topLevelComments = commentRepository.findCommentsByPost(post, pageable);
-//
-//        // 모든 댓글(자식 포함)의 작성자 정보 추가
-//         return mergeAuthorDataRecursively(topLevelComments, token, httpResponse);
-//    }
-
-//    // 특정 게시글의 댓글 목록을 페이징으로 조회
-//    @Transactional(readOnly = true)
-//    @Cacheable(value = RedisKeyConstant.CommentService.WEB_GET_COMMENTS_BY_POST_ID, key = "'postId_'+#postId+'_page_'+#pageable.getPageNumber()+'_size_'+#pageable.getPageSize()")
-//    public DailyfeedPage<CommentDto.Comment> getCommentsByPostWithPaging(Long postId, Pageable pageable, String token, HttpServletResponse httpResponse) {
-//        Post post = getPostByIdOrThrow(postId);
-//
-//        Page<Comment> comments = commentRepository.findTopLevelCommentsByPostWithPaging(post, pageable);
-//
-//        return mergeAuthorDataRecursively(comments, token, httpResponse);
-//    }
-
-//    // 대댓글 목록 조회
-//    @Transactional(readOnly = true)
-//    @Cacheable(value = RedisKeyConstant.CommentService.WEB_GET_COMMENTS_BY_PARENT_ID, key = "'parentId_'+#parentId+'_page_'+#page+'_size_'+#size")
-//    public DailyfeedPage<CommentDto.Comment> getRepliesByParent(Long parentId, int page, int size, String token, HttpServletResponse httpResponse) {
-//        Comment parentComment = commentRepository.findByIdAndNotDeleted(parentId)
-//                .orElseThrow(ParentCommentNotFoundException::new);
-//
-//        Pageable pageable = PageRequest.of(page, size);
-//        Page<Comment> replies = commentRepository.findChildrenByParentWithPaging(parentComment, pageable);
-//
-//        List<CommentDto.Comment> commentList = replies.getContent().stream()
-//                .map(commentMapper::toCommentNonRecursive)
-//                .collect(Collectors.toList());
-//
-//        mergeAuthorAtCommentList(commentList, token, httpResponse);
-//
-//        return pageMapper.fromJpaPageToDailyfeedPage(replies, commentList);
-//    }
-
-//    // 댓글 상세 조회
-//    @Transactional(readOnly = true)
-//    @Cacheable(value = RedisKeyConstant.CommentService.WEB_GET_COMMENT_BY_ID, key = "#commentId")
-//    public CommentDto.Comment getCommentById(Long commentId, String token, HttpServletResponse httpResponse) {
-//        Comment comment = commentRepository.findByIdAndNotDeleted(commentId)
-//                .orElseThrow(CommentNotFoundException::new);
-//
-//        CommentDto.Comment commentDto = commentMapper.toCommentNonRecursive(comment);
-//        mergeAuthorAtCommentList(List.of(commentDto), token, httpResponse);
-//        return commentDto;
-//    }
-
-    // 나의 댓글
-//    @Transactional(readOnly = true)
-//    @Cacheable(value = RedisKeyConstant.CommentService.WEB_GET_COMMENTS_BY_MEMBER_ID, key = "'memberId_'+#memberId+'_page_'+#page+'_size_'+#size")
-//    public DailyfeedPage<CommentDto.CommentSummary> getMyComments(Long memberId, int page, int size, String token, HttpServletResponse httpResponse) {
-//        Pageable pageable = PageRequest.of(page, size);
-//        Page<Comment> comments = commentRepository.findByAuthorIdAndNotDeleted(memberId, pageable);
-//
-//        return mergeAuthorData(comments, token, httpResponse);
-//    }
-
-//    // 특정 사용자의 댓글 목록
-//    @Transactional(readOnly = true)
-//    @Cacheable(value = RedisKeyConstant.CommentService.WEB_GET_COMMENTS_BY_MEMBER_ID, key = "'memberId_'+#memberId+'_page_'+#page+'_size_'+#size")
-//    public DailyfeedPage<CommentDto.CommentSummary> getCommentsByUser(Long memberId, int page, int size, String token, HttpServletResponse httpResponse) {
-//        Pageable pageable = PageRequest.of(page, size);
-//        Page<Comment> comments = commentRepository.findByAuthorIdAndNotDeleted(memberId, pageable);
-//
-//        return mergeAuthorData(comments, token, httpResponse);
-//    }
 
     /// helpers
     public DailyfeedPage<CommentDto.CommentSummary> mergeAuthorData(Page<Comment> commentsPage, String token, HttpServletResponse httpResponse) {
@@ -277,34 +198,9 @@ public class CommentService {
         return pageMapper.fromJpaPageToDailyfeedPage(commentsPage, summaries);
     }
 
-    // 계층구조 댓글에 작성자 정보 추가 (재귀적)
-//    private DailyfeedPage<CommentDto.Comment> mergeAuthorDataRecursively(Page<Comment> commentsPage, String token, HttpServletResponse httpResponse) {
-//        if(commentsPage.isEmpty()) return pageMapper.emptyPage();
-//
-//        List<CommentDto.Comment> commentList = commentsPage.getContent().stream().map(commentMapper::toCommentNonRecursive).collect(Collectors.toList());
-//
-//        Set<Long> authorIds = commentList.stream()
-//                .map(CommentDto.Comment::getAuthorId)
-//                .collect(Collectors.toSet());
-//
-//        Map<Long, MemberProfileDto.Summary> authorMap = memberFeignHelper.getMemberMap(authorIds, token, httpResponse);
-//
-//        commentList.forEach(comment -> {
-//            MemberProfileDto.Summary author = authorMap.get(comment.getAuthorId());
-//            if (author != null) {
-//                comment.updateAuthorRecursively(authorMap);
-//            }
-//        });
-//
-//        return pageMapper.fromJpaPageToDailyfeedPage(commentsPage, commentList);
-//
-//    }
-
     private void mergeAuthorAtComment(CommentDto.Comment comment, MemberProfileDto.Summary summary){
         comment.updateAuthor(summary);
     }
-
-
 
     // 좋아요 증가
     public void incrementLikeCount(MemberDto.Member member, Long commentId) {
@@ -315,8 +211,7 @@ public class CommentService {
                 .orElseThrow(CommentNotFoundException::new);
 
         commentRepository.incrementLikeCount(commentId);
-
-        publishLikeActivity(member.getId(), commentId, CommentLikeType.LIKE);
+        memberActivityKafkaPublisher.publishCommentLikeEvent(member.getId(), comment.getPost().getId(), commentId, MemberActivityType.LIKE_COMMENT);
     }
 
     // 좋아요 감소
@@ -324,44 +219,15 @@ public class CommentService {
         log.info("Decrementing like count for comment: {}", commentId);
 
         // 댓글 존재 확인
-        commentRepository.findByIdAndNotDeleted(commentId)
+        Comment comment = commentRepository.findByIdAndNotDeleted(commentId)
                 .orElseThrow(CommentNotFoundException::new);
 
         commentRepository.decrementLikeCount(commentId);
-        publishLikeActivity(member.getId(), commentId, CommentLikeType.CANCEL);
+        memberActivityKafkaPublisher.publishCommentLikeEvent(member.getId(), comment.getPost().getId(), commentId, MemberActivityType.LIKE_COMMENT_CANCEL);
     }
 
 
     ///  helpers ///
-    /// 댓글 생성/삭제 이벤트
-    public void publishCommentActivity(Long memberId, Long commentId, CommentActivityType activityType) {
-        try{
-            LocalDateTime now = commentEventMapper.currentDateTime();
-            String topicName = DateBasedTopicType.POST_ACTIVITY.generateTopicName(now);
-            CommentDto.CommentActivityEvent activityEvent = commentEventMapper.newCommentActivityEvent(commentId, memberId, activityType, now);
-            kafkaHelper.send(topicName, commentId.toString(), activityEvent);
-        }
-        catch (Exception e){
-            log.error("Error publishing post activity event: ", e);
-            throw new KafkaNetworkErrorException();
-        }
-    }
-
-    /// 댓글 좋아요/좋아요 취소 이벤트
-    public void publishLikeActivity(Long memberId, Long commentId, CommentLikeType commentLikeType) {
-        try{
-            LocalDateTime now = commentEventMapper.currentDateTime();
-            String topicName = DateBasedTopicType.COMMENT_LIKE_ACTIVITY.generateTopicName(now);
-            CommentDto.LikeActivityEvent activityEvent = commentEventMapper.newLikeActivityEvent(commentId, memberId, commentLikeType, now);
-            kafkaHelper.send(topicName, commentId.toString(), activityEvent);
-        }
-        catch (Exception e){
-            log.error("Error publishing post activity event: ", e);
-            throw new KafkaNetworkErrorException();
-        }
-
-    }
-
     /// 글 조회
     public Post getPostByIdOrThrow(Long postId) {
         return postRepository.findByIdAndNotDeleted(postId).orElseThrow(PostNotFoundException::new);

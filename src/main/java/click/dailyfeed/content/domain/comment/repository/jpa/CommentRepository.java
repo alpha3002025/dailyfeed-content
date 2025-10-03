@@ -42,7 +42,7 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
 //    Page<Comment> findCommentsByPost(@Param("post") Post post, Pageable pageable);
 
     // ID로 댓글 조회 (삭제되지 않은)
-    @Query("SELECT c FROM Comment c WHERE c.id = :id AND c.isDeleted = false")
+    @Query("SELECT c FROM Comment c INNER JOIN FETCH c.post WHERE c.id = :id AND c.isDeleted = false")
     Optional<Comment> findByIdAndNotDeleted(@Param("id") Long id);
 
     // 좋아요 수 증가
