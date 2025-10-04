@@ -47,7 +47,7 @@ public class PostService {
         // mongodb 에 본문 내용 저장
         insertNewDocument(savedPost);
 
-        // timeline 조회를 위한 활동 기록 이벤트 발행  TODO :: feat/member/member-activity-logger-v1-0001
+        // timeline 조회를 위한 활동 기록 이벤트 발행
         memberActivityKafkaPublisher.publishPostCUDEvent(post.getAuthorId(), post.getId(), MemberActivityType.POST_CREATE);
 
         // return
@@ -78,7 +78,7 @@ public class PostService {
 
         TimelineStatisticsDto.PostItemCounts postItemCounts = timelineFeignHelper.getPostItemCounts(post.getId(), token, response);
 
-        // timeline 조회를 위한 활동 기록 이벤트 발행  TODO :: feat/member/member-activity-logger-v1-0001
+        // timeline 조회를 위한 활동 기록 이벤트 발행
         memberActivityKafkaPublisher.publishPostCUDEvent(post.getAuthorId(), post.getId(), MemberActivityType.POST_UPDATE);
 
         return postMapper.fromUpdatedPost(post, author, postItemCounts);
@@ -112,7 +112,7 @@ public class PostService {
         // mongodb
         deletePostDocument(post);
 
-        // timeline 을 위한 활동 기록
+        // timeline 조회를 위한 활동 기록 이벤트 발행
         memberActivityKafkaPublisher.publishPostCUDEvent(post.getAuthorId(), post.getId(), MemberActivityType.POST_DELETE);
         return Boolean.TRUE;
     }
