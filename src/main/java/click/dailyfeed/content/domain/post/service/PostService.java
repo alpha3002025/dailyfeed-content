@@ -1,14 +1,11 @@
 package click.dailyfeed.content.domain.post.service;
 
+import click.dailyfeed.code.domain.activity.type.MemberActivityType;
 import click.dailyfeed.code.domain.content.post.dto.PostDto;
 import click.dailyfeed.code.domain.content.post.exception.*;
-import click.dailyfeed.code.domain.content.post.type.PostActivityType;
-import click.dailyfeed.code.domain.content.post.type.PostLikeType;
 import click.dailyfeed.code.domain.member.member.dto.MemberDto;
 import click.dailyfeed.code.domain.member.member.dto.MemberProfileDto;
 import click.dailyfeed.code.domain.timeline.statistics.TimelineStatisticsDto;
-import click.dailyfeed.code.global.kafka.exception.KafkaNetworkErrorException;
-import click.dailyfeed.code.global.kafka.type.DateBasedTopicType;
 import click.dailyfeed.content.domain.post.document.PostDocument;
 import click.dailyfeed.content.domain.post.document.PostLikeDocument;
 import click.dailyfeed.content.domain.post.entity.Post;
@@ -18,14 +15,12 @@ import click.dailyfeed.content.domain.post.repository.jpa.PostRepository;
 import click.dailyfeed.content.domain.post.repository.mongo.PostLikeMongoRepository;
 import click.dailyfeed.content.domain.post.repository.mongo.PostMongoRepository;
 import click.dailyfeed.feign.domain.timeline.TimelineFeignHelper;
-import click.dailyfeed.kafka.domain.kafka.service.KafkaHelper;
+import click.dailyfeed.kafka.domain.activity.publisher.MemberActivityKafkaPublisher;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDateTime;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -38,7 +33,7 @@ public class PostService {
     private final PostMapper postMapper;
     private final PostEventMapper postEventMapper;
     private final TimelineFeignHelper timelineFeignHelper;
-    private final KafkaHelper kafkaHelper;
+    private final MemberActivityKafkaPublisher memberActivityKafkaPublisher;
 
     // 게시글 작성
     public PostDto.Post createPost(MemberProfileDto.Summary author, PostDto.CreatePostRequest request, String token, HttpServletResponse response) {
@@ -52,8 +47,8 @@ public class PostService {
         // mongodb 에 본문 내용 저장
         insertNewDocument(savedPost);
 
-        // timeline 조회를 위한 활동 기록 이벤트 발행  TODO :: feat/member/member-activity-logger-v1-0001
-        publishPostActivity(authorId, savedPost.getId(), PostActivityType.CREATE);
+        // timeline 조회를 위한 활동 기록 이벤트 발행
+        memberActivityKafkaPublisher.publishPostCUDEvent(post.getAuthorId(), post.getId(), MemberActivityType.POST_CREATE);
 
         // return
         return postMapper.fromCreatedPost(post, author);
@@ -81,10 +76,10 @@ public class PostService {
         // mongodb에 본문 내용 저장
         updateDocument(post);
 
-        // timeline 조회를 위한 활동 기록 이벤트 발행 TODO :: feat/member/member-activity-logger-v1-0001
-        publishPostActivity(author.getId(), post.getId(), PostActivityType.UPDATE);
-
         TimelineStatisticsDto.PostItemCounts postItemCounts = timelineFeignHelper.getPostItemCounts(post.getId(), token, response);
+
+        // timeline 조회를 위한 활동 기록 이벤트 발행
+        memberActivityKafkaPublisher.publishPostCUDEvent(post.getAuthorId(), post.getId(), MemberActivityType.POST_UPDATE);
 
         return postMapper.fromUpdatedPost(post, author, postItemCounts);
     }
@@ -101,32 +96,6 @@ public class PostService {
         postMongoRepository.save(updatedPost);
     }
 
-    public void publishLikeActivity(Long memberId, Long postId, PostLikeType postLikeType) {
-        try{
-            LocalDateTime now = postEventMapper.currentDateTime();
-            String topicName = DateBasedTopicType.POST_LIKE_ACTIVITY.generateTopicName(now);
-            PostDto.LikeActivityEvent activityEvent = postEventMapper.newLikeActivityEvent(postId, memberId, postLikeType, now);
-            kafkaHelper.send(topicName, postId.toString(), activityEvent);
-        }
-        catch (Exception e){
-            log.error("Error publishing post activity event: ", e);
-            throw new KafkaNetworkErrorException();
-        }
-    }
-
-    public void publishPostActivity(Long memberId, Long postId, PostActivityType activityType) {
-        try{
-            LocalDateTime now = postEventMapper.currentDateTime();
-            String topicName = DateBasedTopicType.POST_ACTIVITY.generateTopicName(now);
-            PostDto.PostActivityEvent activityEvent = postEventMapper.newPostActivityEvent(memberId, postId, activityType, now);
-            kafkaHelper.send(topicName, postId.toString(), activityEvent);
-        }
-        catch (Exception e){
-            log.error("Error publishing post activity event: ", e);
-            throw new KafkaNetworkErrorException();
-        }
-    }
-
     // 게시글 삭제 (소프트 삭제)
     public Boolean deletePost(MemberDto.Member author, Long postId, HttpServletResponse response) {
         Post post = postRepository.findByIdAndNotDeleted(postId)
@@ -140,12 +109,11 @@ public class PostService {
         // 관계형 데이터베이스에 데이터
         postRepository.softDeleteById(postId);
 
-        // timeline 을 위한 활동 기록
-        publishPostActivity(author.getId(), postId, PostActivityType.SOFT_DELETE);
-
         // mongodb
         deletePostDocument(post);
 
+        // timeline 조회를 위한 활동 기록 이벤트 발행
+        memberActivityKafkaPublisher.publishPostCUDEvent(post.getAuthorId(), post.getId(), MemberActivityType.POST_DELETE);
         return Boolean.TRUE;
     }
 
@@ -174,6 +142,9 @@ public class PostService {
                 .build();
 
         postLikeMongoRepository.save(postLikeDocument);
+
+        // 멤버 활동 기록
+        memberActivityKafkaPublisher.publishPostLikeEvent(member.getId(), post.getId(), MemberActivityType.LIKE_POST);
         return Boolean.TRUE;
     }
 
@@ -191,6 +162,8 @@ public class PostService {
         PostLikeDocument postLikeDocument = postLikeMongoRepository.findByPostPkAndMemberId(post.getId(), member.getId());
         postLikeMongoRepository.deleteById(postLikeDocument.getId());
 
+        // 멤버 활동 기록
+        memberActivityKafkaPublisher.publishPostLikeEvent(member.getId(), post.getId(), MemberActivityType.LIKE_POST_CANCEL);
         return Boolean.TRUE;
     }
 }
