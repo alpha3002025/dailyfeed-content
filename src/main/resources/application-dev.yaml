@@ -38,28 +38,50 @@ spring:
   jackson:
     serialization:
       write-dates-as-timestamps: false
-  ## kafka
+    ## kafka
   kafka:
-    bootstrap-servers: ${KAFKA_SERVER:localhost:29092}
+    bootstrap-servers: ${KAFKA_HOST:localhost}:${KAFKA_PORT:9092}
+    listener:
+      ack-mode: manual_immediate # 수동 커밋
+      concurrency: 3 # 컨슈머 스레드 수
+      poll-timeout: 3000
+      missing-topics-fatal: false  # 토픽이 없어도 시작 가능
     consumer:
-      group-id: post-activity-consumer-group
-      auto-offset-reset: earliest
+      group-id: ${spring.application.name}-group
+      auto-offset-reset: latest
+      enable-auto-commit: false # At Least Once 를 위한 수동 커밋
+      max-poll-records: 500
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
         spring.json.trusted.packages: "click.dailyfeed.code.domain.content,click.dailyfeed.code.domain.member"
+        session.timeout.ms: 30000
+        heartbeat.interval.ms: 10000
+        max.poll.interval.ms: 300000
+        isolation.level: read_committed
+        partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
-      acks: all
+      acks: 1
       retries: 3
-      batch-size: 16384
-      linger-ms: 1
+      batch-size: 32768
+      linger-ms: 20
       buffer-memory: 33554432
+      compression-type: snappy
       properties:
+        enable.idempotence: false
+        max.in.flight.requests.per.connection: 5
         spring.json.add.type.headers: false
-        spring.json.trusted.packages: "click.dailyfeed.code.domain.content.post.dto"
-    # SASL 인증 비활성화 (로컬 docker-compose는 PLAINTEXT 사용)
+        #        spring.json.trusted.packages: "click.dailyfeed.code.domain.content.post.dto"
+        spring.json.trusted.packages: "*"
+        retry.backoff.ms: 100
+        request.timeout.ms: 30000
+  web:
+    resources:
+      static-locations: classpath:/static/
+  mvc:
+    static-path-pattern: /static/**
 springdoc:
   packages-to-scan: click.dailyfeed.timeline.domain
   default-consumes-media-type: application/json;charset=UTF-8
@@ -112,15 +134,27 @@ dailyfeed:
         timeout:
           connect: 5000
           read: 10000
+    image:
+      feign:
+        url: ${IMAGE_SERVICE_URL:http://localhost:8085}
+        timeout:
+          connect: 5000
+          read: 10000
+    activity:
+      feign:
+        url: ${ACTIVITY_SERVICE_URL:http://localhost:8086}
+        timeout:
+          connect: 5000
+          read: 10000
 infrastructure:
   mongodb:
     timeline:
       database: dailyfeed
   redis:
     event-queue:
-      post-activity-event:
-        list-key: POST_ACTIVITY_EVENT_HISTORY
-        dead-letter-list-key: POST_ACTIVITY_EVENT_HISTORY_DEAD
+      member-activity-event:
+        list-key: MEMBER_ACTIVITY_EVENT_HISTORY
+        dead-letter-list-key: MEMBER_ACTIVITY_EVENT_HISTORY_DEAD
         batch-size: 1000
   kafka:
     default:
@@ -130,24 +164,5 @@ infrastructure:
         compression: snappy
         retention-ms: 604800000 # 7일
         operation-timeout-seconds: 30
-    topic:
-      post-activity:
-        prefix: post-activity-
-        prefix-date-format: yyyyMMdd
-        retention-ms: 604800000 # 7일
-        min-insync.replicas: 1 # 쓰기 작업에 필요한 최소 동기화된 레플리카 수
-    consumers:
-      # Post Activity Consumer
-      post-activity:
-        group-id: post-activity-consumer-group
-        concurrency: 3
-      # User Activity Consumer 설정
-      user-activity:
-        group-id: user-activity-consumer-group
-        concurrency: 2
-      # Notification Consumer 설정
-      notification:
-        group-id: notification-consumer-group
-        concurrency: 1
 server:
   port: ${SERVER_PORT:8081}
