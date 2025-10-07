@@ -23,9 +23,9 @@ spring:
   devtools:
     restart:
       enabled: false
+  ## paging 관련
   data:
     web:
-      ## paging 관련
       pageable:
         max-page-size: 100
         default-page-size: 20
@@ -35,12 +35,15 @@ spring:
     mongodb:
       protocol: mongodb # mongodb+srv or mongodb (atlas 에서만 mongodb+srv)
       uri: ${MONGODB_CONNECTION_URI:mongodb://localhost:27017/dailyfeed?directConnection=true}
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
   ## kafka
   kafka:
-    bootstrap-servers: ${KAFKA_HOST:localhost}:29092,${KAFKA_HOST:localhost}:29093,${KAFKA_HOST:localhost}:29094
+    bootstrap-servers: ${KAFKA_HOST:localhost}:${KAFKA_PORT:9092}
     listener:
-      ack-mode: manual_immediate # 수동 커밋 (TODO 확인 필요)
-      concurrency: 3 # 컨슈머 스레드 수 (TODO 확인 필요)
+      ack-mode: manual_immediate # 수동 커밋
+      concurrency: 3 # 컨슈머 스레드 수
       poll-timeout: 3000
       missing-topics-fatal: false  # 토픽이 없어도 시작 가능
     consumer:
@@ -70,7 +73,7 @@ spring:
         enable.idempotence: false
         max.in.flight.requests.per.connection: 5
         spring.json.add.type.headers: false
-#        spring.json.trusted.packages: "click.dailyfeed.code.domain.content.post.dto"
+        #        spring.json.trusted.packages: "click.dailyfeed.code.domain.content.post.dto"
         spring.json.trusted.packages: "*"
         retry.backoff.ms: 100
         request.timeout.ms: 30000
@@ -95,17 +98,13 @@ springdoc:
     tags-sorter: alpha          # 알파벳 순 Tag 정렬, method: HTTP Method 순 정렬
     operations-sorter: alpha    # 알파벳 순 Tag 정렬, method: HTTP Method 순 정렬
 
-## Logging
 logging:
   level:
-    feign: DEBUG
     click.dailyfeed.timeline.client: DEBUG
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
     org.springframework.kafka: INFO
-    org.apache.kafka: INFO
 
-## Application
 dailyfeed:
   services:
     member:
@@ -141,9 +140,9 @@ infrastructure:
       database: dailyfeed
   redis:
     event-queue:
-      post-activity-event:
-        list-key: POST_ACTIVITY_EVENT_HISTORY
-        dead-letter-list-key: POST_ACTIVITY_EVENT_HISTORY_DEAD
+      member-activity-event:
+        list-key: MEMBER_ACTIVITY_EVENT_HISTORY
+        dead-letter-list-key: MEMBER_ACTIVITY_EVENT_HISTORY_DEAD
         batch-size: 1000
   kafka:
     default:
@@ -153,30 +152,5 @@ infrastructure:
         compression: snappy
         retention-ms: 604800000 # 7일
         operation-timeout-seconds: 30
-    topic:
-      post-activity:
-        prefix: post-activity-
-        prefix-date-format: yyyyMMdd
-        retention-ms: 604800000 # 7일
-        min-insync.replicas: 1 # 쓰기 작업에 필요한 최소 동기화된 레플리카 수
-    consumers:
-      # Post Activity Consumer
-      post-activity:
-        group-id: post-activity-consumer-group
-        concurrency: 3
-      # User Activity Consumer 설정
-      user-activity:
-        group-id: user-activity-consumer-group
-        concurrency: 2
-      # Notification Consumer 설정
-      notification:
-        group-id: notification-consumer-group
-        concurrency: 1
 server:
   port: ${SERVER_PORT:8081}
-#  servlet:
-#    context-path: /
-#  compression:
-#    enabled: true
-#    mime-types: application/json,text/plain
-#    min-response-size: 1024
