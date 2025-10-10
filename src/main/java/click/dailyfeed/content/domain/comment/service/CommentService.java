@@ -5,29 +5,23 @@ import click.dailyfeed.code.domain.content.comment.dto.CommentDto;
 import click.dailyfeed.code.domain.content.comment.exception.*;
 import click.dailyfeed.code.domain.member.member.dto.MemberDto;
 import click.dailyfeed.code.domain.member.member.dto.MemberProfileDto;
-import click.dailyfeed.code.global.web.page.DailyfeedPage;
+import click.dailyfeed.code.global.kafka.exception.KafkaDLQRedisNetworkErrorException;
 import click.dailyfeed.content.domain.comment.document.CommentDocument;
 import click.dailyfeed.content.domain.comment.entity.Comment;
-import click.dailyfeed.content.domain.comment.mapper.CommentEventMapper;
 import click.dailyfeed.content.domain.comment.mapper.CommentMapper;
 import click.dailyfeed.content.domain.comment.repository.jpa.CommentRepository;
 import click.dailyfeed.content.domain.comment.repository.mongo.CommentMongoRepository;
 import click.dailyfeed.content.domain.post.entity.Post;
 import click.dailyfeed.content.domain.post.repository.jpa.PostRepository;
+import click.dailyfeed.content.domain.redisdlq.document.RedisDLQDocument;
+import click.dailyfeed.content.domain.redisdlq.repository.mongo.RedisDLQRepository;
 import click.dailyfeed.feign.domain.member.MemberFeignHelper;
 import click.dailyfeed.kafka.domain.activity.publisher.MemberActivityKafkaPublisher;
-import click.dailyfeed.pagination.mapper.PageMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -37,9 +31,9 @@ public class CommentService {
     private final CommentRepository commentRepository;
     private final PostRepository postRepository;
     private final CommentMongoRepository commentMongoRepository;
+    private final RedisDLQRepository redisDLQRepository;
+
     private final CommentMapper commentMapper;
-    private final CommentEventMapper commentEventMapper;
-    private final PageMapper pageMapper;
     private final MemberFeignHelper memberFeignHelper;
     private final MemberActivityKafkaPublisher memberActivityKafkaPublisher;
 
@@ -90,11 +84,17 @@ public class CommentService {
         CommentDto.Comment commentDto = commentMapper.fromCommentNonRecursive(savedComment, member);
         mergeAuthorAtComment(commentDto, member);
 
-        // 멤버 활동 기록
-        memberActivityKafkaPublisher.publishCommentCUDEvent(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_CREATE);
-
-        // mongodb 에 본문 저장 (Season2 개발 예정)
+        // mongodb 에 본문 저장
         insertNewDocument(post, savedComment);
+
+        try {
+            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
+            memberActivityKafkaPublisher.publishCommentCUDEvent(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_CREATE);
+        }
+        catch (KafkaDLQRedisNetworkErrorException redisDlqException){
+            RedisDLQDocument redisDLQDocument = RedisDLQDocument.newRedisDLQ(redisDlqException.getRedisKey(), redisDlqException.getPayload());
+            redisDLQRepository.save(redisDLQDocument);
+        }
 
         return commentDto;
     }
@@ -122,17 +122,21 @@ public class CommentService {
         comment.updateContent(request.getContent());
         Comment updatedComment = commentRepository.save(comment);
 
-        // timeline 을 위한 활동 기록
-        memberActivityKafkaPublisher.publishCommentCUDEvent(member.getId(), comment.getPost().getId(), commentId, MemberActivityType.COMMENT_UPDATE);
-
-        // mongodb 에 본문 저장
         updateDocument(comment);
 
-        // TODO timelineFeignHelper 에서 조회
         // 응답 생성 및 작성자 정보 추가
         CommentDto.Comment commentUpdated = commentMapper.fromCommentNonRecursive(updatedComment, author);
-//        mergeAuthorAtCommentList(List.of(commentUpdated), token, httpResponse);
 
+        try {
+            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
+            memberActivityKafkaPublisher.publishCommentCUDEvent(member.getId(), comment.getPost().getId(), commentId, MemberActivityType.COMMENT_UPDATE);
+        }
+        catch (KafkaDLQRedisNetworkErrorException redisDlqException){
+            RedisDLQDocument redisDLQDocument = RedisDLQDocument.newRedisDLQ(redisDlqException.getRedisKey(), redisDlqException.getPayload());
+            redisDLQRepository.save(redisDLQDocument);
+        }
+
+        // mongodb 에 본문 저장
         return commentUpdated;
     }
 
@@ -163,9 +167,14 @@ public class CommentService {
         commentRepository.softDeleteCommentAndChildren(commentId);
         deleteDocument(comment);
 
-        // timeline 을 위한 활동 기록
-        memberActivityKafkaPublisher.publishCommentCUDEvent(requestedMember.getId(), comment.getPost().getId(), commentId, MemberActivityType.COMMENT_DELETE);
-
+        try {
+            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
+            memberActivityKafkaPublisher.publishCommentCUDEvent(requestedMember.getId(), comment.getPost().getId(), commentId, MemberActivityType.COMMENT_DELETE);
+        }
+        catch (KafkaDLQRedisNetworkErrorException redisDlqException){
+            RedisDLQDocument redisDLQDocument = RedisDLQDocument.newRedisDLQ(redisDlqException.getRedisKey(), redisDlqException.getPayload());
+            redisDLQRepository.save(redisDLQDocument);
+        }
         return Boolean.TRUE;
     }
 
@@ -178,52 +187,43 @@ public class CommentService {
     }
 
     /// helpers
-    public DailyfeedPage<CommentDto.CommentSummary> mergeAuthorData(Page<Comment> commentsPage, String token, HttpServletResponse httpResponse) {
-        List<CommentDto.CommentSummary> summaries = commentsPage.getContent().stream().map(commentMapper::toCommentSummary).collect(Collectors.toList());
-        if (summaries.isEmpty()) return pageMapper.emptyPage();
-
-        Set<Long> authorIds = summaries.stream()
-                .map(CommentDto.CommentSummary::getAuthorId)
-                .collect(Collectors.toSet());
-
-        Map<Long, MemberProfileDto.Summary> authorMap = memberFeignHelper.getMemberMap(authorIds, token, httpResponse);
-
-        summaries.forEach(summary -> {
-            MemberProfileDto.Summary author = authorMap.get(summary.getAuthorId());
-            if (author != null) {
-                summary.updateAuthor(author);
-            }
-        });
-
-        return pageMapper.fromJpaPageToDailyfeedPage(commentsPage, summaries);
-    }
-
     private void mergeAuthorAtComment(CommentDto.Comment comment, MemberProfileDto.Summary summary){
         comment.updateAuthor(summary);
     }
 
     // 좋아요 증가
     public void incrementLikeCount(MemberDto.Member member, Long commentId) {
-        log.info("Incrementing like count for comment: {}", commentId);
-
         // 댓글 존재 확인
         Comment comment = commentRepository.findByIdAndNotDeleted(commentId)
                 .orElseThrow(CommentNotFoundException::new);
 
         commentRepository.incrementLikeCount(commentId);
-        memberActivityKafkaPublisher.publishCommentLikeEvent(member.getId(), comment.getPost().getId(), commentId, MemberActivityType.LIKE_COMMENT);
+        try {
+            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
+            memberActivityKafkaPublisher.publishCommentLikeEvent(member.getId(), comment.getPost().getId(), commentId, MemberActivityType.LIKE_COMMENT);
+        }
+        catch (KafkaDLQRedisNetworkErrorException redisDlqException){
+            RedisDLQDocument redisDLQDocument = RedisDLQDocument.newRedisDLQ(redisDlqException.getRedisKey(), redisDlqException.getPayload());
+            redisDLQRepository.save(redisDLQDocument);
+        }
     }
 
     // 좋아요 감소
     public void decrementLikeCount(MemberDto.Member member, Long commentId) {
-        log.info("Decrementing like count for comment: {}", commentId);
-
         // 댓글 존재 확인
         Comment comment = commentRepository.findByIdAndNotDeleted(commentId)
                 .orElseThrow(CommentNotFoundException::new);
 
         commentRepository.decrementLikeCount(commentId);
-        memberActivityKafkaPublisher.publishCommentLikeEvent(member.getId(), comment.getPost().getId(), commentId, MemberActivityType.LIKE_COMMENT_CANCEL);
+
+        try {
+            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
+            memberActivityKafkaPublisher.publishCommentLikeEvent(member.getId(), comment.getPost().getId(), commentId, MemberActivityType.LIKE_COMMENT_CANCEL);
+        }
+        catch (KafkaDLQRedisNetworkErrorException redisDlqException){
+            RedisDLQDocument redisDLQDocument = RedisDLQDocument.newRedisDLQ(redisDlqException.getRedisKey(), redisDlqException.getPayload());
+            redisDLQRepository.save(redisDLQDocument);
+        }
     }
 
 

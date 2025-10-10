@@ -6,14 +6,16 @@ import click.dailyfeed.code.domain.content.post.exception.*;
 import click.dailyfeed.code.domain.member.member.dto.MemberDto;
 import click.dailyfeed.code.domain.member.member.dto.MemberProfileDto;
 import click.dailyfeed.code.domain.timeline.statistics.TimelineStatisticsDto;
+import click.dailyfeed.code.global.kafka.exception.KafkaDLQRedisNetworkErrorException;
 import click.dailyfeed.content.domain.post.document.PostDocument;
 import click.dailyfeed.content.domain.post.document.PostLikeDocument;
 import click.dailyfeed.content.domain.post.entity.Post;
-import click.dailyfeed.content.domain.post.mapper.PostEventMapper;
 import click.dailyfeed.content.domain.post.mapper.PostMapper;
 import click.dailyfeed.content.domain.post.repository.jpa.PostRepository;
 import click.dailyfeed.content.domain.post.repository.mongo.PostLikeMongoRepository;
 import click.dailyfeed.content.domain.post.repository.mongo.PostMongoRepository;
+import click.dailyfeed.content.domain.redisdlq.document.RedisDLQDocument;
+import click.dailyfeed.content.domain.redisdlq.repository.mongo.RedisDLQRepository;
 import click.dailyfeed.feign.domain.timeline.TimelineFeignHelper;
 import click.dailyfeed.kafka.domain.activity.publisher.MemberActivityKafkaPublisher;
 import jakarta.servlet.http.HttpServletResponse;
@@ -31,12 +33,13 @@ public class PostService {
     private final PostMongoRepository postMongoRepository;
     private final PostLikeMongoRepository postLikeMongoRepository;
     private final PostMapper postMapper;
-    private final PostEventMapper postEventMapper;
     private final TimelineFeignHelper timelineFeignHelper;
     private final MemberActivityKafkaPublisher memberActivityKafkaPublisher;
+    private final RedisDLQRepository redisDLQRepository;
 
     // 게시글 작성
     public PostDto.Post createPost(MemberProfileDto.Summary author, PostDto.CreatePostRequest request, String token, HttpServletResponse response) {
+
         // 작성자 정보 확인
         Long authorId = author.getId();
 
@@ -47,11 +50,17 @@ public class PostService {
         // mongodb 에 본문 내용 저장
         insertNewDocument(savedPost);
 
-        // timeline 조회를 위한 활동 기록 이벤트 발행
-        memberActivityKafkaPublisher.publishPostCUDEvent(post.getAuthorId(), post.getId(), MemberActivityType.POST_CREATE);
-
+        try {
+            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
+            memberActivityKafkaPublisher.publishPostCUDEvent(post.getAuthorId(), post.getId(), MemberActivityType.POST_CREATE);
+        }
+        catch (KafkaDLQRedisNetworkErrorException redisDlqException){
+            RedisDLQDocument redisDLQDocument = RedisDLQDocument.newRedisDLQ(redisDlqException.getRedisKey(), redisDlqException.getPayload());
+            redisDLQRepository.save(redisDLQDocument);
+        }
         // return
         return postMapper.fromCreatedPost(post, author);
+
     }
 
     public void insertNewDocument(Post post){
@@ -78,8 +87,14 @@ public class PostService {
 
         TimelineStatisticsDto.PostItemCounts postItemCounts = timelineFeignHelper.getPostItemCounts(post.getId(), token, response);
 
-        // timeline 조회를 위한 활동 기록 이벤트 발행
-        memberActivityKafkaPublisher.publishPostCUDEvent(post.getAuthorId(), post.getId(), MemberActivityType.POST_UPDATE);
+        try{
+            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
+            memberActivityKafkaPublisher.publishPostCUDEvent(post.getAuthorId(), post.getId(), MemberActivityType.POST_UPDATE);
+        }
+        catch (KafkaDLQRedisNetworkErrorException redisDlqException){
+            RedisDLQDocument redisDLQDocument = RedisDLQDocument.newRedisDLQ(redisDlqException.getRedisKey(), redisDlqException.getPayload());
+            redisDLQRepository.save(redisDLQDocument);
+        }
 
         return postMapper.fromUpdatedPost(post, author, postItemCounts);
     }
@@ -112,8 +127,15 @@ public class PostService {
         // mongodb
         deletePostDocument(post);
 
-        // timeline 조회를 위한 활동 기록 이벤트 발행
-        memberActivityKafkaPublisher.publishPostCUDEvent(post.getAuthorId(), post.getId(), MemberActivityType.POST_DELETE);
+        // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
+        try {
+            memberActivityKafkaPublisher.publishPostCUDEvent(post.getAuthorId(), post.getId(), MemberActivityType.POST_DELETE);
+        }
+        catch (KafkaDLQRedisNetworkErrorException redisDlqException){
+            RedisDLQDocument redisDLQDocument = RedisDLQDocument.newRedisDLQ(redisDlqException.getRedisKey(), redisDlqException.getPayload());
+            redisDLQRepository.save(redisDLQDocument);
+        }
+
         return Boolean.TRUE;
     }
 
@@ -143,8 +165,15 @@ public class PostService {
 
         postLikeMongoRepository.save(postLikeDocument);
 
-        // 멤버 활동 기록
-        memberActivityKafkaPublisher.publishPostLikeEvent(member.getId(), post.getId(), MemberActivityType.LIKE_POST);
+        // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
+        try {
+            memberActivityKafkaPublisher.publishPostLikeEvent(member.getId(), post.getId(), MemberActivityType.LIKE_POST);
+        }
+        catch (KafkaDLQRedisNetworkErrorException redisDlqException){
+            RedisDLQDocument redisDLQDocument = RedisDLQDocument.newRedisDLQ(redisDlqException.getRedisKey(), redisDlqException.getPayload());
+            redisDLQRepository.save(redisDLQDocument);
+        }
+
         return Boolean.TRUE;
     }
 
@@ -162,8 +191,15 @@ public class PostService {
         PostLikeDocument postLikeDocument = postLikeMongoRepository.findByPostPkAndMemberId(post.getId(), member.getId());
         postLikeMongoRepository.deleteById(postLikeDocument.getId());
 
-        // 멤버 활동 기록
-        memberActivityKafkaPublisher.publishPostLikeEvent(member.getId(), post.getId(), MemberActivityType.LIKE_POST_CANCEL);
+        // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
+        try {
+            memberActivityKafkaPublisher.publishPostLikeEvent(member.getId(), post.getId(), MemberActivityType.LIKE_POST_CANCEL);
+        }
+        catch (KafkaDLQRedisNetworkErrorException redisDlqException){
+            RedisDLQDocument redisDLQDocument = RedisDLQDocument.newRedisDLQ(redisDlqException.getRedisKey(), redisDlqException.getPayload());
+            redisDLQRepository.save(redisDLQDocument);
+        }
+
         return Boolean.TRUE;
     }
 }
