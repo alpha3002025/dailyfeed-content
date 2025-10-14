@@ -240,7 +240,7 @@ public class CommentService {
             throw new ParentCommentPostMismatchException();
         }
 
-        Comment comment = click.dailyfeed.content.domain.comment.entity.Comment.replyCommentBuilder()
+        Comment comment = Comment.replyCommentBuilder()
                 .content(request.getContent())
                 .authorId(authorId)
                 .post(post)
