@@ -44,13 +44,13 @@ public class CommentService {
     private static final int MAX_COMMENT_DEPTH = 2; // 최대 댓글 깊이 제한
 
     // 댓글 작성
-    public CommentDto.ReplyComment createComment(MemberProfileDto.Summary member, String token, CommentDto.CreateCommentRequest request, HttpServletResponse httpResponse) {
+    public CommentDto.Comment createComment(MemberProfileDto.Summary member, String token, CommentDto.CreateCommentRequest request, HttpServletResponse httpResponse) {
         Long authorId = member.getId();
 
         // 게시글 존재 확인
         Post post = getPostByIdOrThrow(request.getPostId());
 
-        Comment comment = Comment.commentBuilder()
+        Comment comment = click.dailyfeed.content.domain.comment.entity.Comment.commentBuilder()
                     .content(request.getContent())
                     .authorId(authorId)
                     .post(post)
@@ -59,7 +59,7 @@ public class CommentService {
         Comment savedComment = commentRepository.save(comment);
 
         // 응답 생성 및 작성자 정보 추가
-        CommentDto.ReplyComment commentDto = commentMapper.fromCommentNonRecursive(savedComment, member);
+        CommentDto.Comment commentDto = commentMapper.fromCommentNonRecursive(savedComment, member);
 
         // mongodb 에 본문 저장
         insertNewDocument(post, savedComment);
@@ -83,7 +83,7 @@ public class CommentService {
     }
 
     // 댓글 수정
-    public CommentDto.ReplyComment updateComment(MemberDto.Member member, Long commentId, CommentDto.UpdateCommentRequest request, String token, HttpServletResponse httpResponse) {
+    public CommentDto.Comment updateComment(MemberDto.Member member, Long commentId, CommentDto.UpdateCommentRequest request, String token, HttpServletResponse httpResponse) {
         MemberProfileDto.Summary author = memberFeignHelper.getMemberSummaryById(member.getId(), token, httpResponse);
         Long authorId = author.getId();
 
@@ -102,7 +102,7 @@ public class CommentService {
         updateDocument(comment);
 
         // 응답 생성 및 작성자 정보 추가
-        CommentDto.ReplyComment commentUpdated = commentMapper.fromCommentNonRecursive(updatedComment, author);
+        CommentDto.Comment commentUpdated = commentMapper.fromCommentNonRecursive(updatedComment, author);
 
         try {
             // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
@@ -222,7 +222,7 @@ public class CommentService {
         return postRepository.findByIdAndNotDeleted(postId).orElseThrow(PostNotFoundException::new);
     }
 
-    public CommentDto.ReplyComment createReply(MemberProfileDto.Summary member, String authorizationHeader, CommentDto.@Valid CreateCommentRequest request, HttpServletResponse httpResponse) {
+    public CommentDto.Comment createReply(MemberProfileDto.Summary member, String authorizationHeader, CommentDto.@Valid CreateCommentRequest request, HttpServletResponse httpResponse) {
         Long authorId = member.getId();
         // 게시글 존재 확인
         Post post = getPostByIdOrThrow(request.getPostId());
@@ -240,7 +240,7 @@ public class CommentService {
             throw new ParentCommentPostMismatchException();
         }
 
-        Comment comment = Comment.replyCommentBuilder()
+        Comment comment = click.dailyfeed.content.domain.comment.entity.Comment.replyCommentBuilder()
                 .content(request.getContent())
                 .authorId(authorId)
                 .post(post)
@@ -250,7 +250,7 @@ public class CommentService {
         Comment savedComment = commentRepository.save(comment);
 
         // 응답 생성 및 작성자 정보 추가
-        CommentDto.ReplyComment commentDto = commentMapper.fromCommentNonRecursive(savedComment, member);
+        CommentDto.Comment commentDto = commentMapper.fromCommentNonRecursive(savedComment, member);
 
         // mongodb 에 본문 저장
         insertNewDocument(post, savedComment);

@@ -8,8 +8,8 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class CommentMapper {
-    public CommentDto.ReplyComment fromCommentNonRecursive(Comment comment, MemberProfileDto.Summary author){
-        return CommentDto.ReplyComment.builder()
+    public CommentDto.Comment fromCommentNonRecursive(Comment comment, MemberProfileDto.Summary author){
+        return CommentDto.Comment.builder()
                 .id(comment.getId())
                 .content(comment.getContent())
                 .authorId(comment.getAuthorId())
