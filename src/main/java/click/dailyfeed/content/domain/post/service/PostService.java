@@ -187,9 +187,7 @@ public class PostService {
         if (existDocument == null) {
             throw new PostLikeCancelAlreadyCommittedException();
         }
-
-        PostLikeDocument postLikeDocument = postLikeMongoRepository.findByPostPkAndMemberId(post.getId(), member.getId());
-        postLikeMongoRepository.deleteById(postLikeDocument.getId());
+        postLikeMongoRepository.deleteById(existDocument.getId());
 
         // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
         try {
