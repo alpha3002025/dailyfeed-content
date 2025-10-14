@@ -62,8 +62,8 @@ public class Comment extends BaseTimeEntity {
         this.content = content;
         this.post = post;
         this.authorId = authorId;
-        this.parent = parent;
-        this.depth = parent != null ? parent.getDepth() + 1 : 0;
+//        this.parent = parent;
+//        this.depth = parent != null ? parent.getDepth() + 1 : 0;
     }
 
     // 비즈니스 메서드
@@ -86,6 +86,7 @@ public class Comment extends BaseTimeEntity {
     public void addChild(Comment child) {
         children.add(child);
         child.updateParent(this);
+        child.depth = this.depth + 1;  // 자식의 depth = 부모의 depth + 1
     }
 
     public void softDelete() {

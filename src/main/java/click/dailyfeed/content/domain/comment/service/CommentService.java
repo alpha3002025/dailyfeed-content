@@ -189,6 +189,10 @@ public class CommentService {
             RedisDLQDocument redisDLQDocument = RedisDLQDocument.newRedisDLQ(redisDlqException.getRedisKey(), redisDlqException.getPayload());
             redisDLQRepository.save(redisDLQDocument);
         }
+        catch (Exception e) {
+            RedisDLQDocument redisDLQDocument = RedisDLQDocument.newRedisDLQ("1", "asdfa");
+            redisDLQRepository.save(redisDLQDocument);
+        }
 
         return Boolean.TRUE;
     }
@@ -244,9 +248,9 @@ public class CommentService {
                 .content(request.getContent())
                 .authorId(authorId)
                 .post(post)
-                .parent(parentComment)
                 .build();
 
+        parentComment.addChild(comment);
         Comment savedComment = commentRepository.save(comment);
 
         // 응답 생성 및 작성자 정보 추가
