@@ -12,7 +12,7 @@ import org.springframework.data.mongodb.core.mapping.Field;
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor
-@Document(collection = "post_likes")
+@Document(collection = "comment_likes")
 public class CommentLikeDocument {
 
     @Id

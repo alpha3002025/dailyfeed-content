@@ -1,11 +1,11 @@
 package click.dailyfeed.content.domain.comment.document;
 
-import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.bson.types.ObjectId;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.PersistenceCreator;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
 
@@ -13,7 +13,6 @@ import java.time.LocalDateTime;
 
 @Getter
 @NoArgsConstructor
-@AllArgsConstructor
 @Document(collection = "comments")
 public class CommentDocument {
     @Id
@@ -25,6 +24,9 @@ public class CommentDocument {
     @Field("comment_pk")
     private Long commentPk;
 
+    @Field("parent_pk")
+    private Long parentPk;
+
     private String content;
 
     @Field("created_at")
@@ -35,6 +37,27 @@ public class CommentDocument {
 
     @Field("is_deleted")
     private Boolean isDeleted;
+
+    @PersistenceCreator
+    public CommentDocument(
+        ObjectId id,
+        Long postPk,
+        Long commentPk,
+        Long parentPk,
+        String content,
+        LocalDateTime createdAt,
+        LocalDateTime updatedAt,
+        Boolean isDeleted
+    ){
+        this.id = id;
+        this.postPk = postPk;
+        this.commentPk = commentPk;
+        this.parentPk = parentPk;
+        this.content = content;
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
+        this.isDeleted = isDeleted;
+    }
 
     @Builder(builderMethodName = "newCommentBuilder", builderClassName = "NewPost")
     private CommentDocument(Long postPk, Long commentPk, String content, LocalDateTime createdAt, LocalDateTime updatedAt) {
@@ -66,9 +89,19 @@ public class CommentDocument {
                 .build();
     }
 
-    public static CommentDocument newUpdatedPost(CommentDocument commentDocument, LocalDateTime updatedAt){
+    public static CommentDocument newUpdatedComment(CommentDocument commentDocument, LocalDateTime updatedAt){
         return CommentDocument.updatedCommentBuilder()
                 .oldDocument(commentDocument)
+                .updatedAt(updatedAt)
+                .build();
+    }
+
+    public static CommentDocument newReplyDocument(Long postPk, Long parentPk, Long commentPk, String content, LocalDateTime createdAt, LocalDateTime updatedAt){
+        return CommentDocument.newCommentBuilder()
+                .postPk(postPk)
+                .commentPk(commentPk)
+                .content(content)
+                .createdAt(createdAt)
                 .updatedAt(updatedAt)
                 .build();
     }

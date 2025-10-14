@@ -57,7 +57,7 @@ public class Comment extends BaseTimeEntity {
         this.authorId = authorId;
     }
 
-    @Builder(builderMethodName = "levelCommentBuilder")
+    @Builder(builderMethodName = "replyCommentBuilder")
     public Comment(String content, Post post, Comment parent, Long authorId){
         this.content = content;
         this.post = post;
