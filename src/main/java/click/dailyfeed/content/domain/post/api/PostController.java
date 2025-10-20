@@ -64,9 +64,10 @@ public class PostController {
     @DeleteMapping("/{postId}")
     public DailyfeedServerResponse<Boolean> deletePost(
             @AuthenticatedMember MemberDto.Member member,
+            @RequestHeader(value = "Authorization", required = false) String token,
             HttpServletResponse httpResponse,
             @PathVariable Long postId ) {
-        Boolean result = postService.deletePost(member, postId, httpResponse);
+        Boolean result = postService.deletePost(member, postId, token, httpResponse);
         return DailyfeedServerResponse.<Boolean>builder()
                 .status(HttpStatus.OK.value())
                 .result(ResponseSuccessCode.SUCCESS)
@@ -117,10 +118,12 @@ public class PostController {
     @PostMapping("/{postId}/like")
     public DailyfeedServerResponse<Boolean> incrementLikeCount(
             @AuthenticatedMember MemberDto.Member member,
+            @RequestHeader(value = "Authorization", required = false) String token,
+            HttpServletResponse httpResponse,
             @PathVariable Long postId
     ) {
 
-        Boolean result = postService.incrementLikeCount(postId, member);
+        Boolean result = postService.incrementLikeCount(postId, member, token, httpResponse);
         return DailyfeedServerResponse.<Boolean>builder()
                 .status(HttpStatus.OK.value())
                 .result(ResponseSuccessCode.SUCCESS)
@@ -132,9 +135,11 @@ public class PostController {
     @DeleteMapping("/{postId}/like")
     public DailyfeedServerResponse<Boolean> decrementLikeCount(
             @AuthenticatedMember MemberDto.Member member,
+            @RequestHeader(value = "Authorization", required = false) String token,
+            HttpServletResponse httpResponse,
             @PathVariable Long postId) {
 
-        Boolean result = postService.decrementLikeCount(postId, member);
+        Boolean result = postService.decrementLikeCount(postId, member, token, httpResponse);
         return DailyfeedServerResponse.<Boolean>builder()
                 .status(HttpStatus.OK.value())
                 .result(ResponseSuccessCode.SUCCESS)
