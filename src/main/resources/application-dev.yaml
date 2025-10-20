@@ -1,6 +1,9 @@
 spring:
   application:
     name: dailyfeed-content
+  config:
+    import:
+      - classpath:feign-config-dev.yaml
   ## database connection
   datasource:
     driver-class-name: com.mysql.jdbc.Driver
