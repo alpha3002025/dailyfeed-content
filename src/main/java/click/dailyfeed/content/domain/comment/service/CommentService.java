@@ -22,7 +22,7 @@ import click.dailyfeed.content.domain.redisdlq.document.RedisDLQDocument;
 import click.dailyfeed.content.domain.redisdlq.repository.mongo.RedisDLQRepository;
 import click.dailyfeed.feign.domain.member.MemberFeignHelper;
 import click.dailyfeed.kafka.domain.activity.publisher.MemberActivityKafkaPublisher;
-import click.dailyfeed.pvc.domain.kafka.service.KafkaFailureStorageService;
+import click.dailyfeed.pvc.domain.kafka.service.KafkaPublisherFailureStorageService;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -45,8 +45,7 @@ public class CommentService {
     private final MemberFeignHelper memberFeignHelper;
     private final MemberActivityKafkaPublisher memberActivityKafkaPublisher;
 
-    private final KafkaFailureStorageService kafkaFailureStorageService;
-
+    private final KafkaPublisherFailureStorageService kafkaPublisherFailureStorageService;
     private static final int MAX_COMMENT_DEPTH = CommentProperties.MAX_COMMENT_DEPTH; // 최대 댓글 깊이 제한
 
     // 댓글 작성
@@ -232,9 +231,9 @@ public class CommentService {
                 .orElseThrow(ParentCommentNotFoundException::new);
 
         // 댓글 깊이 제한 확인
-        if (parentComment.getDepth() >= MAX_COMMENT_DEPTH) {
-            throw new CommentDepthLimitExceedsException();
-        }
+//        if (parentComment.getDepth() >= MAX_COMMENT_DEPTH) {
+//            throw new CommentDepthLimitExceedsException();
+//        }
 
         // 부모 댓글과 같은 게시글인지 확인
         if (!parentComment.getPost().getId().equals(request.getPostId())) {
@@ -279,7 +278,7 @@ public class CommentService {
         }
         catch (Exception e) {
             try{
-                kafkaFailureStorageService.store(ServiceType.MEMBER_ACTIVITY.name(), memberActivityType.getCode(), redisDlqException.getRedisKey(), redisDlqException.getPayload());
+                kafkaPublisherFailureStorageService.store(ServiceType.MEMBER_ACTIVITY.name(), memberActivityType.getCode(), redisDlqException.getRedisKey(), redisDlqException.getPayload());
             }
             catch (Exception finalException){
                 // PVC 저장까지 실패할 경우 트랜잭션을 실패시키는 것으로 처리
