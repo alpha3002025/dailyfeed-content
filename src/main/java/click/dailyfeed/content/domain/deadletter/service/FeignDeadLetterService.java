@@ -4,7 +4,7 @@ import click.dailyfeed.code.domain.activity.dto.MemberActivityDto;
 import click.dailyfeed.code.global.feign.exception.FeignApiSerializationFailException;
 import click.dailyfeed.content.domain.deadletter.document.FeignDeadLetterDocument;
 import click.dailyfeed.content.domain.deadletter.mapper.FeignDeadLetterMapper;
-import click.dailyfeed.content.domain.deadletter.mongo.FeignDeadLetterRepository;
+import click.dailyfeed.content.domain.deadletter.repository.mongo.FeignDeadLetterRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
