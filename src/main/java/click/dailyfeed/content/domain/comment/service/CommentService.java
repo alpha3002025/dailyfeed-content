@@ -1,5 +1,6 @@
 package click.dailyfeed.content.domain.comment.service;
 
+import click.dailyfeed.code.domain.activity.dto.MemberActivityDto;
 import click.dailyfeed.code.domain.activity.type.MemberActivityType;
 import click.dailyfeed.code.domain.content.comment.dto.CommentDto;
 import click.dailyfeed.code.domain.content.comment.exception.*;
@@ -20,6 +21,7 @@ import click.dailyfeed.content.domain.post.entity.Post;
 import click.dailyfeed.content.domain.post.repository.jpa.PostRepository;
 import click.dailyfeed.content.domain.redisdlq.document.RedisDLQDocument;
 import click.dailyfeed.content.domain.redisdlq.repository.mongo.RedisDLQRepository;
+import click.dailyfeed.feign.domain.activity.MemberActivityFeignHelper;
 import click.dailyfeed.feign.domain.member.MemberFeignHelper;
 import click.dailyfeed.kafka.domain.activity.publisher.MemberActivityKafkaPublisher;
 import click.dailyfeed.pvc.domain.kafka.service.KafkaPublisherFailureStorageService;
@@ -43,6 +45,7 @@ public class CommentService {
 
     private final CommentMapper commentMapper;
     private final MemberFeignHelper memberFeignHelper;
+    private final MemberActivityFeignHelper memberActivityFeignHelper;
     private final MemberActivityKafkaPublisher memberActivityKafkaPublisher;
 
     private final KafkaPublisherFailureStorageService kafkaPublisherFailureStorageService;
@@ -69,14 +72,18 @@ public class CommentService {
         // mongodb 에 본문 저장
         insertNewDocument(post, savedComment);
 
-        try {
-            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
-            memberActivityKafkaPublisher.publishCommentCUDEvent(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_CREATE);
-        }
-        catch (KafkaDLQRedisNetworkErrorException redisDlqException){
-            handleRedisDLQException(redisDlqException, MemberActivityType.COMMENT_CREATE);
-        }
+        /// kafka 를 사용할 경우 (케이스 A)
+//        try {
+//            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
+//            memberActivityKafkaPublisher.publishCommentCUDEvent(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_CREATE);
+//        }
+//        catch (KafkaDLQRedisNetworkErrorException redisDlqException){
+//            handleRedisDLQException(redisDlqException, MemberActivityType.COMMENT_CREATE);
+//        }
 
+        /// feign 을 사용할 경우 (케이스 B)
+        MemberActivityDto.CommentActivityRequest feignRequest = commentMapper.commentActivityFeignRequest(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_CREATE);
+        memberActivityFeignHelper.createCommentsMemberActivity(feignRequest, token, httpResponse);
         return commentDto;
     }
 
@@ -108,13 +115,18 @@ public class CommentService {
         // 응답 생성 및 작성자 정보 추가
         CommentDto.Comment commentUpdated = commentMapper.fromCommentNonRecursive(updatedComment, author);
 
-        try {
-            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
-            memberActivityKafkaPublisher.publishCommentCUDEvent(member.getId(), comment.getPost().getId(), commentId, MemberActivityType.COMMENT_UPDATE);
-        }
-        catch (KafkaDLQRedisNetworkErrorException redisDlqException){
-            handleRedisDLQException(redisDlqException, MemberActivityType.COMMENT_UPDATE);
-        }
+        /// kafka 를 사용할 경우 (케이스 A)
+//        try {
+//            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
+//            memberActivityKafkaPublisher.publishCommentCUDEvent(member.getId(), comment.getPost().getId(), commentId, MemberActivityType.COMMENT_UPDATE);
+//        }
+//        catch (KafkaDLQRedisNetworkErrorException redisDlqException){
+//            handleRedisDLQException(redisDlqException, MemberActivityType.COMMENT_UPDATE);
+//        }
+
+        /// feign 을 사용할 경우 (케이스 B)
+        MemberActivityDto.CommentActivityRequest feignRequest = commentMapper.commentActivityFeignRequest(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_UPDATE);
+        memberActivityFeignHelper.createCommentsMemberActivity(feignRequest, token, httpResponse);
 
         // mongodb 에 본문 저장
         return commentUpdated;
@@ -147,13 +159,19 @@ public class CommentService {
         commentRepository.softDeleteCommentAndChildren(commentId);
         deleteDocument(comment);
 
-        try {
-            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
-            memberActivityKafkaPublisher.publishCommentCUDEvent(requestedMember.getId(), comment.getPost().getId(), commentId, MemberActivityType.COMMENT_DELETE);
-        }
-        catch (KafkaDLQRedisNetworkErrorException redisDlqException){
-            handleRedisDLQException(redisDlqException, MemberActivityType.COMMENT_DELETE);
-        }
+        /// kafka 를 사용할 경우 (케이스 A)
+//        try {
+//            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
+//            memberActivityKafkaPublisher.publishCommentCUDEvent(requestedMember.getId(), comment.getPost().getId(), commentId, MemberActivityType.COMMENT_DELETE);
+//        }
+//        catch (KafkaDLQRedisNetworkErrorException redisDlqException){
+//            handleRedisDLQException(redisDlqException, MemberActivityType.COMMENT_DELETE);
+//        }
+
+        /// feign 을 사용할 경우 (케이스 B)
+        MemberActivityDto.CommentActivityRequest feignRequest = commentMapper.commentActivityFeignRequest(requestedMember.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_DELETE);
+        memberActivityFeignHelper.createCommentsMemberActivity(feignRequest, token, httpResponse);
+
         return Boolean.TRUE;
     }
 
@@ -165,10 +183,8 @@ public class CommentService {
         commentMongoRepository.delete(document);
     }
 
-    /// helpers
-
     // 좋아요 증가
-    public Boolean incrementLikeCount(MemberDto.Member member, Long commentId) {
+    public Boolean incrementLikeCount(MemberDto.Member member, Long commentId, String token, HttpServletResponse httpResponse) {
         // 댓글 존재 확인
         Comment comment = commentRepository.findByIdAndNotDeleted(commentId)
                 .orElseThrow(CommentNotFoundException::new);
@@ -183,19 +199,25 @@ public class CommentService {
                 .memberId(member.getId())
                 .build();
         commentLikeMongoRepository.save(newDocument);
-        try {
-            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
-            memberActivityKafkaPublisher.publishCommentLikeEvent(member.getId(), comment.getPost().getId(), commentId, MemberActivityType.LIKE_COMMENT);
-        }
-        catch (KafkaDLQRedisNetworkErrorException redisDlqException){
-            handleRedisDLQException(redisDlqException, MemberActivityType.LIKE_COMMENT);
-        }
+
+        /// kafka 를 사용할 경우 (케이스 A)
+//        try {
+//            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
+//            memberActivityKafkaPublisher.publishCommentLikeEvent(member.getId(), comment.getPost().getId(), commentId, MemberActivityType.LIKE_COMMENT);
+//        }
+//        catch (KafkaDLQRedisNetworkErrorException redisDlqException){
+//            handleRedisDLQException(redisDlqException, MemberActivityType.LIKE_COMMENT);
+//        }
+
+        /// feign 을 사용할 경우 (케이스 B)
+        MemberActivityDto.CommentLikeActivityRequest feignRequest = commentMapper.commentLikeActivityFeignRequest(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.LIKE_COMMENT);
+        memberActivityFeignHelper.createCommentLikeMemberActivity(feignRequest, token, httpResponse);
 
         return Boolean.TRUE;
     }
 
     // 좋아요 감소
-    public void decrementLikeCount(MemberDto.Member member, Long commentId) {
+    public void decrementLikeCount(MemberDto.Member member, Long commentId, String token, HttpServletResponse httpResponse) {
         // 댓글 존재 확인
         Comment comment = commentRepository.findByIdAndNotDeleted(commentId)
                 .orElseThrow(CommentNotFoundException::new);
@@ -206,13 +228,18 @@ public class CommentService {
         }
         commentLikeMongoRepository.delete(existDocument);
 
-        try {
-            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
-            memberActivityKafkaPublisher.publishCommentLikeEvent(member.getId(), comment.getPost().getId(), commentId, MemberActivityType.LIKE_COMMENT_CANCEL);
-        }
-        catch (KafkaDLQRedisNetworkErrorException redisDlqException){
-            handleRedisDLQException(redisDlqException, MemberActivityType.LIKE_COMMENT_CANCEL);
-        }
+        /// kafka 를 사용할 경우 (케이스 A)
+//        try {
+//            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
+//            memberActivityKafkaPublisher.publishCommentLikeEvent(member.getId(), comment.getPost().getId(), commentId, MemberActivityType.LIKE_COMMENT_CANCEL);
+//        }
+//        catch (KafkaDLQRedisNetworkErrorException redisDlqException){
+//            handleRedisDLQException(redisDlqException, MemberActivityType.LIKE_COMMENT_CANCEL);
+//        }
+
+        /// feign 을 사용할 경우 (케이스 B)
+        MemberActivityDto.CommentLikeActivityRequest feignRequest = commentMapper.commentLikeActivityFeignRequest(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.LIKE_COMMENT);
+        memberActivityFeignHelper.createCommentLikeMemberActivity(feignRequest, token, httpResponse);
     }
 
 
@@ -255,30 +282,30 @@ public class CommentService {
         // mongodb 에 본문 저장
         insertNewDocument(post, savedComment);
 
-        try {
-            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
-            memberActivityKafkaPublisher.publishCommentCUDEvent(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_CREATE);
-        }
-        catch (KafkaDLQRedisNetworkErrorException redisDlqException){
-            handleRedisDLQException(redisDlqException, MemberActivityType.COMMENT_CREATE);
-        }
-        return commentDto;
-    }
+        /// 카프카를 사용할 경우 (케이스 A)
+//        try {
+//            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
+//            memberActivityKafkaPublisher.publishCommentCUDEvent(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_CREATE);
+//        }
+//        catch (KafkaDLQRedisNetworkErrorException redisDlqException){
+//            handleRedisDLQException(redisDlqException, MemberActivityType.COMMENT_CREATE);
+//        }
 
-    public void insertNewReplyDocument(Post post, Comment parentComment, Comment comment) {
-        CommentDocument document = CommentDocument.newReplyDocument(
-                post.getId(), parentComment.getId(), comment.getId(), comment.getContent(), comment.getCreatedAt(), comment.getUpdatedAt());
-        commentMongoRepository.save(document);
+        /// feign 을 사용할 경우 (케이스 B)
+        MemberActivityDto.CommentActivityRequest feignRequest = commentMapper.commentActivityFeignRequest(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_CREATE);
+        memberActivityFeignHelper.createCommentsMemberActivity(feignRequest, authorizationHeader, httpResponse);
+
+        return commentDto;
     }
 
     public void handleRedisDLQException(KafkaDLQRedisNetworkErrorException redisDlqException, MemberActivityType memberActivityType){
         try {
-            RedisDLQDocument redisDLQDocument = RedisDLQDocument.newRedisDLQ(redisDlqException.getRedisKey(), redisDlqException.getPayload());
+            RedisDLQDocument redisDLQDocument = RedisDLQDocument.newRedisDLQ(redisDlqException.getMessageKey(), redisDlqException.getPayload());
             redisDLQRepository.save(redisDLQDocument);
         }
         catch (Exception e) {
             try{
-                kafkaPublisherFailureStorageService.store(ServiceType.MEMBER_ACTIVITY.name(), memberActivityType.getCode(), redisDlqException.getRedisKey(), redisDlqException.getPayload());
+                kafkaPublisherFailureStorageService.store(ServiceType.MEMBER_ACTIVITY.name(), memberActivityType.getCode(), redisDlqException.getMessageKey(), redisDlqException.getPayload());
             }
             catch (Exception finalException){
                 // PVC 저장까지 실패할 경우 트랜잭션을 실패시키는 것으로 처리

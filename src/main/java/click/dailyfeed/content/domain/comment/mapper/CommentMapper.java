@@ -1,5 +1,7 @@
 package click.dailyfeed.content.domain.comment.mapper;
 
+import click.dailyfeed.code.domain.activity.dto.MemberActivityDto;
+import click.dailyfeed.code.domain.activity.type.MemberActivityType;
 import click.dailyfeed.code.domain.content.comment.dto.CommentDto;
 import click.dailyfeed.code.domain.member.member.dto.MemberProfileDto;
 import click.dailyfeed.code.global.menu.MessageProperties;
@@ -21,6 +23,24 @@ public class CommentMapper {
                 .depth(comment.getDepth())
                 .createdAt(comment.getCreatedAt())
                 .updatedAt(comment.getUpdatedAt())
+                .build();
+    }
+
+    public MemberActivityDto.CommentActivityRequest commentActivityFeignRequest(Long memberId, Long postId, Long commentId, MemberActivityType activityType){
+        return MemberActivityDto.CommentActivityRequest.builder()
+                .memberId(memberId)
+                .postId(postId)
+                .commentId(commentId)
+                .activityType(activityType)
+                .build();
+    }
+
+    public MemberActivityDto.CommentLikeActivityRequest commentLikeActivityFeignRequest(Long memberId, Long postId, Long commentId, MemberActivityType activityType){
+        return MemberActivityDto.CommentLikeActivityRequest.builder()
+                .memberId(memberId)
+                .postId(postId)
+                .commentId(commentId)
+                .activityType(activityType)
                 .build();
     }
 }

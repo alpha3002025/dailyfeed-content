@@ -1,5 +1,6 @@
 package click.dailyfeed.content.domain.post.service;
 
+import click.dailyfeed.code.domain.activity.dto.MemberActivityDto;
 import click.dailyfeed.code.domain.activity.type.MemberActivityType;
 import click.dailyfeed.code.domain.content.post.dto.PostDto;
 import click.dailyfeed.code.domain.content.post.exception.*;
@@ -18,6 +19,7 @@ import click.dailyfeed.content.domain.post.repository.mongo.PostLikeMongoReposit
 import click.dailyfeed.content.domain.post.repository.mongo.PostMongoRepository;
 import click.dailyfeed.content.domain.redisdlq.document.RedisDLQDocument;
 import click.dailyfeed.content.domain.redisdlq.repository.mongo.RedisDLQRepository;
+import click.dailyfeed.feign.domain.activity.MemberActivityFeignHelper;
 import click.dailyfeed.feign.domain.timeline.TimelineFeignHelper;
 import click.dailyfeed.kafka.domain.activity.publisher.MemberActivityKafkaPublisher;
 import click.dailyfeed.pvc.domain.kafka.service.KafkaPublisherFailureStorageService;
@@ -38,6 +40,7 @@ public class PostService {
 
     private final PostMapper postMapper;
     private final TimelineFeignHelper timelineFeignHelper;
+    private final MemberActivityFeignHelper memberActivityFeignHelper;
     private final MemberActivityKafkaPublisher memberActivityKafkaPublisher;
     private final RedisDLQRepository redisDLQRepository;
     
@@ -55,13 +58,20 @@ public class PostService {
         // mongodb 에 본문 내용 저장
         insertNewDocument(savedPost);
 
-        try {
-            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
-            memberActivityKafkaPublisher.publishPostCUDEvent(post.getAuthorId(), post.getId(), MemberActivityType.POST_CREATE);
-        }
-        catch (KafkaDLQRedisNetworkErrorException redisDlqException){
-            handleRedisDLQException(redisDlqException, MemberActivityType.POST_CREATE);
-        }
+
+        /// kafka 를 사용할 경우 (케이스 A)
+//        try {
+//            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
+//            memberActivityKafkaPublisher.publishPostCUDEvent(post.getAuthorId(), post.getId(), MemberActivityType.POST_CREATE);
+//        }
+//        catch (KafkaDLQRedisNetworkErrorException redisDlqException){
+//            handleRedisDLQException(redisDlqException, MemberActivityType.POST_CREATE);
+//        }
+
+        /// feign 을 사용할 경우 (케이스 B)
+        MemberActivityDto.PostActivityRequest feignRequest = postMapper.postActivityFeignRequest(post.getAuthorId(), post.getId(), MemberActivityType.POST_CREATE);
+        memberActivityFeignHelper.createPostsMemberActivity(feignRequest, token, response);
+
         // return
         return postMapper.fromCreatedPost(post, author);
 
@@ -91,13 +101,18 @@ public class PostService {
 
         TimelineStatisticsDto.PostItemCounts postItemCounts = timelineFeignHelper.getPostItemCounts(post.getId(), token, response);
 
-        try{
-            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
-            memberActivityKafkaPublisher.publishPostCUDEvent(post.getAuthorId(), post.getId(), MemberActivityType.POST_UPDATE);
-        }
-        catch (KafkaDLQRedisNetworkErrorException redisDlqException){
-            handleRedisDLQException(redisDlqException, MemberActivityType.POST_UPDATE);
-        }
+        /// kafka 를 사용할 경우 (케이스 A)
+//        try{
+//            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
+//            memberActivityKafkaPublisher.publishPostCUDEvent(post.getAuthorId(), post.getId(), MemberActivityType.POST_UPDATE);
+//        }
+//        catch (KafkaDLQRedisNetworkErrorException redisDlqException){
+//            handleRedisDLQException(redisDlqException, MemberActivityType.POST_UPDATE);
+//        }
+
+        /// feign 을 사용할 경우 (케이스 B)
+        MemberActivityDto.PostActivityRequest feignRequest = postMapper.postActivityFeignRequest(post.getAuthorId(), post.getId(), MemberActivityType.POST_UPDATE);
+        memberActivityFeignHelper.createPostsMemberActivity(feignRequest, token, response);
 
         return postMapper.fromUpdatedPost(post, author, postItemCounts);
     }
@@ -115,7 +130,7 @@ public class PostService {
     }
 
     // 게시글 삭제 (소프트 삭제)
-    public Boolean deletePost(MemberDto.Member author, Long postId, HttpServletResponse response) {
+    public Boolean deletePost(MemberDto.Member author, Long postId, String token, HttpServletResponse response) {
         Post post = postRepository.findByIdAndNotDeleted(postId)
                 .orElseThrow(PostNotFoundException::new);
 
@@ -130,13 +145,18 @@ public class PostService {
         // mongodb
         deletePostDocument(post);
 
+        /// kafka 를 사용할 경우 (케이스 A)
         // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
-        try {
-            memberActivityKafkaPublisher.publishPostCUDEvent(post.getAuthorId(), post.getId(), MemberActivityType.POST_DELETE);
-        }
-        catch (KafkaDLQRedisNetworkErrorException redisDlqException){
-            handleRedisDLQException(redisDlqException, MemberActivityType.POST_DELETE);
-        }
+//        try {
+//            memberActivityKafkaPublisher.publishPostCUDEvent(post.getAuthorId(), post.getId(), MemberActivityType.POST_DELETE);
+//        }
+//        catch (KafkaDLQRedisNetworkErrorException redisDlqException){
+//            handleRedisDLQException(redisDlqException, MemberActivityType.POST_DELETE);
+//        }
+
+        /// feign 을 사용할 경우 (케이스 B)
+        MemberActivityDto.PostActivityRequest feignRequest = postMapper.postActivityFeignRequest(post.getAuthorId(), post.getId(), MemberActivityType.POST_DELETE);
+        memberActivityFeignHelper.createPostsMemberActivity(feignRequest, token, response);
 
         return Boolean.TRUE;
     }
@@ -150,7 +170,7 @@ public class PostService {
     }
 
     // 게시글 좋아요 증가
-    public Boolean incrementLikeCount(Long postId, MemberDto.Member member) {
+    public Boolean incrementLikeCount(Long postId, MemberDto.Member member, String token, HttpServletResponse response) {
         // 게시글 존재 확인
         Post post = postRepository.findByIdAndNotDeleted(postId)
                 .orElseThrow(PostNotFoundException::new);
@@ -168,18 +188,23 @@ public class PostService {
         postLikeMongoRepository.save(postLikeDocument);
 
         // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
-        try {
-            memberActivityKafkaPublisher.publishPostLikeEvent(member.getId(), post.getId(), MemberActivityType.LIKE_POST);
-        }
-        catch (KafkaDLQRedisNetworkErrorException redisDlqException){
-            handleRedisDLQException(redisDlqException, MemberActivityType.LIKE_POST);
-        }
+        /// kafka 를 사용할 경우 (케이스 A)
+//        try {
+//            memberActivityKafkaPublisher.publishPostLikeEvent(member.getId(), post.getId(), MemberActivityType.LIKE_POST);
+//        }
+//        catch (KafkaDLQRedisNetworkErrorException redisDlqException){
+//            handleRedisDLQException(redisDlqException, MemberActivityType.LIKE_POST);
+//        }
+
+        /// feign 을 사용할 경우 (케이스 B)
+        MemberActivityDto.PostLikeActivityRequest feignRequest = postMapper.postLikeActivityFeignRequest(post.getAuthorId(), post.getId(), MemberActivityType.LIKE_POST);
+        memberActivityFeignHelper.createPostLikeMemberActivity(feignRequest, token, response);
 
         return Boolean.TRUE;
     }
 
     // 게시글 좋아요 감소
-    public Boolean decrementLikeCount(Long postId, MemberDto.Member member) {
+    public Boolean decrementLikeCount(Long postId, MemberDto.Member member, String token, HttpServletResponse response) {
         // 게시글 존재 확인
         Post post = postRepository.findByIdAndNotDeleted(postId)
                 .orElseThrow(PostNotFoundException::new);
@@ -191,16 +216,22 @@ public class PostService {
         postLikeMongoRepository.deleteById(existDocument.getId());
 
         // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
-        try {
-            memberActivityKafkaPublisher.publishPostLikeEvent(member.getId(), post.getId(), MemberActivityType.LIKE_POST_CANCEL);
-        }
-        catch (KafkaDLQRedisNetworkErrorException redisDlqException){
-            handleRedisDLQException(redisDlqException, MemberActivityType.LIKE_POST_CANCEL);
-        }
+        /// kafka 를 사용할 경우 (케이스 A)
+//        try {
+//            memberActivityKafkaPublisher.publishPostLikeEvent(member.getId(), post.getId(), MemberActivityType.LIKE_POST_CANCEL);
+//        }
+//        catch (KafkaDLQRedisNetworkErrorException redisDlqException){
+//            handleRedisDLQException(redisDlqException, MemberActivityType.LIKE_POST_CANCEL);
+//        }
+
+        /// feign 을 사용할 경우 (케이스 B)
+        MemberActivityDto.PostLikeActivityRequest feignRequest = postMapper.postLikeActivityFeignRequest(post.getAuthorId(), post.getId(), MemberActivityType.LIKE_POST_CANCEL);
+        memberActivityFeignHelper.createPostLikeMemberActivity(feignRequest, token, response);
 
         return Boolean.TRUE;
     }
 
+    /// kafka
     public void handleRedisDLQException(KafkaDLQRedisNetworkErrorException redisDlqException, MemberActivityType memberActivityType){
         try {
             RedisDLQDocument redisDLQDocument = RedisDLQDocument.newRedisDLQ(redisDlqException.getMessageKey(), redisDlqException.getPayload());

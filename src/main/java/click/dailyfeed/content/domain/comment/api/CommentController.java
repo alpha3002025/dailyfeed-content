@@ -170,9 +170,11 @@ public class CommentController {
     @PostMapping("/{commentId}/like")
     public DailyfeedServerResponse<Boolean> likeComment(
             @PathVariable Long commentId,
-            @AuthenticatedMember MemberDto.Member member
+            @AuthenticatedMember MemberDto.Member member,
+            @RequestHeader("Authorization") String authorizationHeader,
+            HttpServletResponse httpResponse
     ) {
-        commentService.incrementLikeCount(member, commentId);
+        commentService.incrementLikeCount(member, commentId, authorizationHeader, httpResponse);
         return DailyfeedServerResponse.<Boolean>builder()
                 .status(HttpStatus.CREATED.value())
                 .result(ResponseSuccessCode.SUCCESS)
@@ -184,9 +186,11 @@ public class CommentController {
     @DeleteMapping("/{commentId}/like")
     public DailyfeedServerResponse<Boolean> cancelLikeComment(
             @PathVariable Long commentId,
-            @AuthenticatedMember MemberDto.Member member
+            @AuthenticatedMember MemberDto.Member member,
+            @RequestHeader("Authorization") String authorizationHeader,
+            HttpServletResponse httpResponse
     ) {
-        commentService.decrementLikeCount(member, commentId);
+        commentService.decrementLikeCount(member, commentId, authorizationHeader, httpResponse);
         return DailyfeedServerResponse.<Boolean>builder()
                 .status(HttpStatus.NO_CONTENT.value())
                 .result(ResponseSuccessCode.SUCCESS)
