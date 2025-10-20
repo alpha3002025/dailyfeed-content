@@ -19,6 +19,10 @@ import click.dailyfeed.content.domain.redisdlq.document.RedisDLQDocument;
 import click.dailyfeed.content.domain.redisdlq.repository.mongo.RedisDLQRepository;
 import click.dailyfeed.feign.domain.member.MemberFeignHelper;
 import click.dailyfeed.kafka.domain.activity.publisher.MemberActivityKafkaPublisher;
+<<<<<<< Updated upstream
+=======
+import click.dailyfeed.pvc.domain.kafka.service.KafkaPublisherFailureStorageService;
+>>>>>>> Stashed changes
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -41,7 +45,13 @@ public class CommentService {
     private final MemberFeignHelper memberFeignHelper;
     private final MemberActivityKafkaPublisher memberActivityKafkaPublisher;
 
+<<<<<<< Updated upstream
     private static final int MAX_COMMENT_DEPTH = 2; // 최대 댓글 깊이 제한
+=======
+    private final KafkaPublisherFailureStorageService kafkaPublisherFailureStorageService;
+
+    private static final int MAX_COMMENT_DEPTH = CommentProperties.MAX_COMMENT_DEPTH; // 최대 댓글 깊이 제한
+>>>>>>> Stashed changes
 
     // 댓글 작성
     public CommentDto.Comment createComment(MemberProfileDto.Summary member, String token, CommentDto.CreateCommentRequest request, HttpServletResponse httpResponse) {
@@ -277,4 +287,23 @@ public class CommentService {
                 post.getId(), parentComment.getId(), comment.getId(), comment.getContent(), comment.getCreatedAt(), comment.getUpdatedAt());
         commentMongoRepository.save(document);
     }
+<<<<<<< Updated upstream
+=======
+
+    public void handleRedisDLQException(KafkaDLQRedisNetworkErrorException redisDlqException, MemberActivityType memberActivityType){
+        try {
+            RedisDLQDocument redisDLQDocument = RedisDLQDocument.newRedisDLQ(redisDlqException.getRedisKey(), redisDlqException.getPayload());
+            redisDLQRepository.save(redisDLQDocument);
+        }
+        catch (Exception e) {
+            try{
+                kafkaPublisherFailureStorageService.store(ServiceType.MEMBER_ACTIVITY.name(), memberActivityType.getCode(), redisDlqException.getRedisKey(), redisDlqException.getPayload());
+            }
+            catch (Exception finalException){
+                // PVC 저장까지 실패할 경우 트랜잭션을 실패시키는 것으로 처리
+                throw new KafkaNetworkErrorException();
+            }
+        }
+    }
+>>>>>>> Stashed changes
 }

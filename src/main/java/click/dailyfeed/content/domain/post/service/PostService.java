@@ -18,6 +18,10 @@ import click.dailyfeed.content.domain.redisdlq.document.RedisDLQDocument;
 import click.dailyfeed.content.domain.redisdlq.repository.mongo.RedisDLQRepository;
 import click.dailyfeed.feign.domain.timeline.TimelineFeignHelper;
 import click.dailyfeed.kafka.domain.activity.publisher.MemberActivityKafkaPublisher;
+<<<<<<< Updated upstream
+=======
+import click.dailyfeed.pvc.domain.kafka.service.KafkaPublisherFailureStorageService;
+>>>>>>> Stashed changes
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +41,11 @@ public class PostService {
     private final MemberActivityKafkaPublisher memberActivityKafkaPublisher;
     private final RedisDLQRepository redisDLQRepository;
 
+<<<<<<< Updated upstream
+=======
+    private final KafkaPublisherFailureStorageService kafkaPublisherFailureStorageService;
+
+>>>>>>> Stashed changes
     // 게시글 작성
     public PostDto.Post createPost(MemberProfileDto.Summary author, PostDto.CreatePostRequest request, String token, HttpServletResponse response) {
 
@@ -200,4 +209,23 @@ public class PostService {
 
         return Boolean.TRUE;
     }
+<<<<<<< Updated upstream
+=======
+
+    public void handleRedisDLQException(KafkaDLQRedisNetworkErrorException redisDlqException, MemberActivityType memberActivityType){
+        try {
+            RedisDLQDocument redisDLQDocument = RedisDLQDocument.newRedisDLQ(redisDlqException.getRedisKey(), redisDlqException.getPayload());
+            redisDLQRepository.save(redisDLQDocument);
+        }
+        catch (Exception e) {
+            try{
+                kafkaPublisherFailureStorageService.store(ServiceType.MEMBER_ACTIVITY.name(), memberActivityType.getCode(), redisDlqException.getRedisKey(), redisDlqException.getPayload());
+            }
+            catch (Exception finalException){
+                // PVC 저장까지 실패할 경우 트랜잭션을 실패시키는 것으로 처리
+                throw new KafkaNetworkErrorException();
+            }
+        }
+    }
+>>>>>>> Stashed changes
 }
