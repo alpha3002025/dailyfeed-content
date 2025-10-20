@@ -1,6 +1,9 @@
 spring:
   application:
     name: dailyfeed-content
+  config:
+    import:
+      - classpath:feign-config-local.yaml
   ## database connection
   datasource:
     driver-class-name: com.mysql.jdbc.Driver
@@ -147,6 +150,7 @@ dailyfeed:
         timeout:
           connect: 5000
           read: 10000
+
 infrastructure:
   mongodb:
     timeline:
