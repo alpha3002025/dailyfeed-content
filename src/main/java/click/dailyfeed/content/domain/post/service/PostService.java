@@ -203,12 +203,12 @@ public class PostService {
 
     public void handleRedisDLQException(KafkaDLQRedisNetworkErrorException redisDlqException, MemberActivityType memberActivityType){
         try {
-            RedisDLQDocument redisDLQDocument = RedisDLQDocument.newRedisDLQ(redisDlqException.getRedisKey(), redisDlqException.getPayload());
+            RedisDLQDocument redisDLQDocument = RedisDLQDocument.newRedisDLQ(redisDlqException.getMessageKey(), redisDlqException.getPayload());
             redisDLQRepository.save(redisDLQDocument);
         }
         catch (Exception e) {
             try{
-                kafkaPublisherFailureStorageService.store(ServiceType.MEMBER_ACTIVITY.name(), memberActivityType.getCode(), redisDlqException.getRedisKey(), redisDlqException.getPayload());
+                kafkaPublisherFailureStorageService.store(ServiceType.MEMBER_ACTIVITY.name(), memberActivityType.getCode(), redisDlqException.getMessageKey(), redisDlqException.getPayload());
             }
             catch (Exception finalException){
                 // PVC 저장까지 실패할 경우 트랜잭션을 실패시키는 것으로 처리
