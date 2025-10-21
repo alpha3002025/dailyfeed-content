@@ -6,6 +6,7 @@ import click.dailyfeed.code.domain.content.comment.dto.CommentDto;
 import click.dailyfeed.code.domain.content.comment.exception.*;
 import click.dailyfeed.code.domain.member.member.dto.MemberDto;
 import click.dailyfeed.code.domain.member.member.dto.MemberProfileDto;
+import click.dailyfeed.code.global.feign.exception.FeignApiCommunicationFailException;
 import click.dailyfeed.code.global.kafka.exception.KafkaDLQRedisNetworkErrorException;
 import click.dailyfeed.code.global.kafka.exception.KafkaNetworkErrorException;
 import click.dailyfeed.code.global.pvc.type.ServiceType;
@@ -17,6 +18,7 @@ import click.dailyfeed.content.domain.comment.mapper.CommentMapper;
 import click.dailyfeed.content.domain.comment.repository.jpa.CommentRepository;
 import click.dailyfeed.content.domain.comment.repository.mongo.CommentLikeMongoRepository;
 import click.dailyfeed.content.domain.comment.repository.mongo.CommentMongoRepository;
+import click.dailyfeed.content.domain.deadletter.service.FeignDeadLetterService;
 import click.dailyfeed.content.domain.post.entity.Post;
 import click.dailyfeed.content.domain.post.repository.jpa.PostRepository;
 import click.dailyfeed.content.domain.redisdlq.document.RedisDLQDocument;
@@ -42,6 +44,8 @@ public class CommentService {
     private final CommentMongoRepository commentMongoRepository;
     private final CommentLikeMongoRepository commentLikeMongoRepository;
     private final RedisDLQRepository redisDLQRepository;
+
+    private final FeignDeadLetterService feignDeadLetterService;
 
     private final CommentMapper commentMapper;
     private final MemberFeignHelper memberFeignHelper;
@@ -83,7 +87,15 @@ public class CommentService {
 
         /// feign 을 사용할 경우 (케이스 B)
         MemberActivityDto.CommentActivityRequest feignRequest = commentMapper.commentActivityFeignRequest(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_CREATE);
-        memberActivityFeignHelper.createCommentsMemberActivity(feignRequest, token, httpResponse);
+        try {
+            memberActivityFeignHelper.createCommentsMemberActivity(feignRequest, token, httpResponse);
+        } catch (Exception e) {
+            try {
+                feignDeadLetterService.createCommentActivityDeadLetter(feignRequest);
+            } catch (Exception e1) {
+                throw new FeignApiCommunicationFailException();
+            }
+        }
         return commentDto;
     }
 
@@ -126,7 +138,15 @@ public class CommentService {
 
         /// feign 을 사용할 경우 (케이스 B)
         MemberActivityDto.CommentActivityRequest feignRequest = commentMapper.commentActivityFeignRequest(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_UPDATE);
-        memberActivityFeignHelper.createCommentsMemberActivity(feignRequest, token, httpResponse);
+        try {
+            memberActivityFeignHelper.createCommentsMemberActivity(feignRequest, token, httpResponse);
+        } catch (Exception e) {
+            try {
+                feignDeadLetterService.createCommentActivityDeadLetter(feignRequest);
+            } catch (Exception e1) {
+                throw new FeignApiCommunicationFailException();
+            }
+        }
 
         // mongodb 에 본문 저장
         return commentUpdated;
@@ -170,7 +190,15 @@ public class CommentService {
 
         /// feign 을 사용할 경우 (케이스 B)
         MemberActivityDto.CommentActivityRequest feignRequest = commentMapper.commentActivityFeignRequest(requestedMember.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_DELETE);
-        memberActivityFeignHelper.createCommentsMemberActivity(feignRequest, token, httpResponse);
+        try {
+            memberActivityFeignHelper.createCommentsMemberActivity(feignRequest, token, httpResponse);
+        } catch (Exception e) {
+            try {
+                feignDeadLetterService.createCommentActivityDeadLetter(feignRequest);
+            } catch (Exception e1) {
+                throw new FeignApiCommunicationFailException();
+            }
+        }
 
         return Boolean.TRUE;
     }
@@ -211,7 +239,15 @@ public class CommentService {
 
         /// feign 을 사용할 경우 (케이스 B)
         MemberActivityDto.CommentLikeActivityRequest feignRequest = commentMapper.commentLikeActivityFeignRequest(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.LIKE_COMMENT);
-        memberActivityFeignHelper.createCommentLikeMemberActivity(feignRequest, token, httpResponse);
+        try {
+            memberActivityFeignHelper.createCommentLikeMemberActivity(feignRequest, token, httpResponse);
+        } catch (Exception e) {
+            try {
+                feignDeadLetterService.createCommentLikeActivityDeadLetter(feignRequest);
+            } catch (Exception e1) {
+                throw new FeignApiCommunicationFailException();
+            }
+        }
 
         return Boolean.TRUE;
     }
@@ -239,14 +275,15 @@ public class CommentService {
 
         /// feign 을 사용할 경우 (케이스 B)
         MemberActivityDto.CommentLikeActivityRequest feignRequest = commentMapper.commentLikeActivityFeignRequest(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.LIKE_COMMENT);
-        memberActivityFeignHelper.createCommentLikeMemberActivity(feignRequest, token, httpResponse);
-    }
-
-
-    ///  helpers ///
-    /// 글 조회
-    public Post getPostByIdOrThrow(Long postId) {
-        return postRepository.findByIdAndNotDeleted(postId).orElseThrow(PostNotFoundException::new);
+        try {
+            memberActivityFeignHelper.createCommentLikeMemberActivity(feignRequest, token, httpResponse);
+        } catch (Exception e) {
+            try {
+                feignDeadLetterService.createCommentLikeActivityDeadLetter(feignRequest);
+            } catch (Exception e1) {
+                throw new FeignApiCommunicationFailException();
+            }
+        }
     }
 
     public CommentDto.Comment createReply(MemberProfileDto.Summary member, String authorizationHeader, CommentDto.@Valid CreateCommentRequest request, HttpServletResponse httpResponse) {
@@ -293,9 +330,23 @@ public class CommentService {
 
         /// feign 을 사용할 경우 (케이스 B)
         MemberActivityDto.CommentActivityRequest feignRequest = commentMapper.commentActivityFeignRequest(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_CREATE);
-        memberActivityFeignHelper.createCommentsMemberActivity(feignRequest, authorizationHeader, httpResponse);
+        try {
+            memberActivityFeignHelper.createCommentsMemberActivity(feignRequest, authorizationHeader, httpResponse);
+        } catch (Exception e) {
+            try {
+                feignDeadLetterService.createCommentActivityDeadLetter(feignRequest);
+            } catch (Exception e1) {
+                throw new FeignApiCommunicationFailException();
+            }
+        }
 
         return commentDto;
+    }
+
+    ///  helpers ///
+    /// 글 조회
+    public Post getPostByIdOrThrow(Long postId) {
+        return postRepository.findByIdAndNotDeleted(postId).orElseThrow(PostNotFoundException::new);
     }
 
     public void handleRedisDLQException(KafkaDLQRedisNetworkErrorException redisDlqException, MemberActivityType memberActivityType){

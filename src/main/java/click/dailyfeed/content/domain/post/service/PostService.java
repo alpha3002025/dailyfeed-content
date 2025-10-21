@@ -7,9 +7,11 @@ import click.dailyfeed.code.domain.content.post.exception.*;
 import click.dailyfeed.code.domain.member.member.dto.MemberDto;
 import click.dailyfeed.code.domain.member.member.dto.MemberProfileDto;
 import click.dailyfeed.code.domain.timeline.statistics.TimelineStatisticsDto;
+import click.dailyfeed.code.global.feign.exception.FeignApiCommunicationFailException;
 import click.dailyfeed.code.global.kafka.exception.KafkaDLQRedisNetworkErrorException;
 import click.dailyfeed.code.global.kafka.exception.KafkaNetworkErrorException;
 import click.dailyfeed.code.global.pvc.type.ServiceType;
+import click.dailyfeed.content.domain.deadletter.service.FeignDeadLetterService;
 import click.dailyfeed.content.domain.post.document.PostDocument;
 import click.dailyfeed.content.domain.post.document.PostLikeDocument;
 import click.dailyfeed.content.domain.post.entity.Post;
@@ -37,6 +39,8 @@ public class PostService {
     private final PostRepository postRepository;
     private final PostMongoRepository postMongoRepository;
     private final PostLikeMongoRepository postLikeMongoRepository;
+
+    private final FeignDeadLetterService feignDeadLetterService;
 
     private final PostMapper postMapper;
     private final TimelineFeignHelper timelineFeignHelper;
@@ -70,7 +74,16 @@ public class PostService {
 
         /// feign 을 사용할 경우 (케이스 B)
         MemberActivityDto.PostActivityRequest feignRequest = postMapper.postActivityFeignRequest(post.getAuthorId(), post.getId(), MemberActivityType.POST_CREATE);
-        memberActivityFeignHelper.createPostsMemberActivity(feignRequest, token, response);
+        try{
+            memberActivityFeignHelper.createPostsMemberActivity(feignRequest, token, response);
+        }
+        catch (Exception e){
+            try {
+                feignDeadLetterService.createPostActivityDeadLetter(feignRequest);
+            } catch (Exception e1) {
+                throw new FeignApiCommunicationFailException();
+            }
+        }
 
         // return
         return postMapper.fromCreatedPost(post, author);
@@ -112,7 +125,16 @@ public class PostService {
 
         /// feign 을 사용할 경우 (케이스 B)
         MemberActivityDto.PostActivityRequest feignRequest = postMapper.postActivityFeignRequest(post.getAuthorId(), post.getId(), MemberActivityType.POST_UPDATE);
-        memberActivityFeignHelper.createPostsMemberActivity(feignRequest, token, response);
+        try{
+            memberActivityFeignHelper.createPostsMemberActivity(feignRequest, token, response);
+        }
+        catch (Exception e){
+            try{
+                feignDeadLetterService.createPostActivityDeadLetter(feignRequest);
+            } catch (Exception e1) {
+                throw new FeignApiCommunicationFailException();
+            }
+        }
 
         return postMapper.fromUpdatedPost(post, author, postItemCounts);
     }
@@ -156,7 +178,16 @@ public class PostService {
 
         /// feign 을 사용할 경우 (케이스 B)
         MemberActivityDto.PostActivityRequest feignRequest = postMapper.postActivityFeignRequest(post.getAuthorId(), post.getId(), MemberActivityType.POST_DELETE);
-        memberActivityFeignHelper.createPostsMemberActivity(feignRequest, token, response);
+        try{
+            memberActivityFeignHelper.createPostsMemberActivity(feignRequest, token, response);
+        }
+        catch (Exception e){
+            try{
+                feignDeadLetterService.createPostActivityDeadLetter(feignRequest);
+            } catch (Exception e1) {
+                throw new FeignApiCommunicationFailException();
+            }
+        }
 
         return Boolean.TRUE;
     }
@@ -198,7 +229,15 @@ public class PostService {
 
         /// feign 을 사용할 경우 (케이스 B)
         MemberActivityDto.PostLikeActivityRequest feignRequest = postMapper.postLikeActivityFeignRequest(post.getAuthorId(), post.getId(), MemberActivityType.LIKE_POST);
-        memberActivityFeignHelper.createPostLikeMemberActivity(feignRequest, token, response);
+        try {
+            memberActivityFeignHelper.createPostLikeMemberActivity(feignRequest, token, response);
+        } catch (Exception e){
+            try {
+                feignDeadLetterService.createPostLikeActivityDeadLetter(feignRequest);
+            } catch (Exception e1) {
+                throw new FeignApiCommunicationFailException();
+            }
+        }
 
         return Boolean.TRUE;
     }
@@ -226,7 +265,15 @@ public class PostService {
 
         /// feign 을 사용할 경우 (케이스 B)
         MemberActivityDto.PostLikeActivityRequest feignRequest = postMapper.postLikeActivityFeignRequest(post.getAuthorId(), post.getId(), MemberActivityType.LIKE_POST_CANCEL);
-        memberActivityFeignHelper.createPostLikeMemberActivity(feignRequest, token, response);
+        try {
+            memberActivityFeignHelper.createPostLikeMemberActivity(feignRequest, token, response);
+        } catch (Exception e){
+            try{
+                feignDeadLetterService.createPostLikeActivityDeadLetter(feignRequest);
+            } catch (Exception e1){
+                throw new FeignApiCommunicationFailException();
+            }
+        }
 
         return Boolean.TRUE;
     }
