@@ -295,9 +295,9 @@ public class CommentService {
                 .orElseThrow(ParentCommentNotFoundException::new);
 
         // 댓글 깊이 제한 확인
-//        if (parentComment.getDepth() >= MAX_COMMENT_DEPTH) {
-//            throw new CommentDepthLimitExceedsException();
-//        }
+        if (parentComment.getDepth() >= MAX_COMMENT_DEPTH) {
+            throw new CommentDepthLimitExceedsException();
+        }
 
         // 부모 댓글과 같은 게시글인지 확인
         if (!parentComment.getPost().getId().equals(request.getPostId())) {
