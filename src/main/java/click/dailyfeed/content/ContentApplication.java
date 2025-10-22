@@ -37,6 +37,7 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 		"click.dailyfeed.redis",
 		"click.dailyfeed.kafka",
 		"click.dailyfeed.pvc",
+		"click.dailyfeed.deadletter",
 })
 public class ContentApplication {
 
