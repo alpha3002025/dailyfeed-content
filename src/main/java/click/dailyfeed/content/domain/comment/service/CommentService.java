@@ -78,11 +78,11 @@ public class CommentService {
 //        try {
 //            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
 //            memberActivityKafkaPublisher.publishCommentCUDEvent(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_CREATE);
-//        } catch (KafkaDLQRedisNetworkErrorException redisDlqException){
+//        } catch (Exception e){
 //            MemberActivityDto.CommentActivityRequest activityRequest = memberActivityMapper.newCommentActivityRequest(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_CREATE);
 //            try {
 //                kafkaPublisherDeadLetterService.createCommentActivityDeadLetter(activityRequest);
-//            } catch (Exception e){
+//            } catch (Exception e1){
 //                throw new KafkaNetworkErrorException();
 //            }
 //        }
@@ -133,11 +133,11 @@ public class CommentService {
 //        try {
 //            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
 //            memberActivityKafkaPublisher.publishCommentCUDEvent(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_UPDATE);
-//        } catch (KafkaDLQRedisNetworkErrorException redisDlqException){
+//        } catch (Exception e){
 //            MemberActivityDto.CommentActivityRequest activityRequest = memberActivityMapper.newCommentActivityRequest(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_UPDATE);
 //            try {
 //                kafkaPublisherDeadLetterService.createCommentActivityDeadLetter(activityRequest);
-//            } catch (Exception e){
+//            } catch (Exception e1){
 //                throw new KafkaNetworkErrorException();
 //            }
 //        }
@@ -189,11 +189,11 @@ public class CommentService {
 //        try {
 //            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
 //            memberActivityKafkaPublisher.publishCommentCUDEvent(requestedMember.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_DELETE);
-//        } catch (KafkaDLQRedisNetworkErrorException redisDlqException){
+//        } catch (Exception e){
 //            MemberActivityDto.CommentActivityRequest activityRequest = memberActivityMapper.newCommentActivityRequest(requestedMember.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_DELETE);
 //            try {
 //                kafkaPublisherDeadLetterService.createCommentActivityDeadLetter(activityRequest);
-//            } catch (Exception e){
+//            } catch (Exception e1){
 //                throw new KafkaNetworkErrorException();
 //            }
 //        }
@@ -242,11 +242,11 @@ public class CommentService {
 //        try {
 //            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
 //            memberActivityKafkaPublisher.publishCommentLikeEvent(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.LIKE_COMMENT);
-//        } catch (KafkaDLQRedisNetworkErrorException redisDlqException){
+//        } catch (Exception e){
 //            MemberActivityDto.CommentLikeActivityRequest activityRequest = memberActivityMapper.newCommentLikeActivityRequest(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.LIKE_COMMENT);
 //            try {
 //                kafkaPublisherDeadLetterService.createCommentLikeActivityDeadLetter(activityRequest);
-//            } catch (Exception e){
+//            } catch (Exception e1){
 //                throw new KafkaNetworkErrorException();
 //            }
 //        }
@@ -282,11 +282,11 @@ public class CommentService {
 //        try {
 //            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
 //            memberActivityKafkaPublisher.publishCommentLikeEvent(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.LIKE_COMMENT_CANCEL);
-//        } catch (KafkaDLQRedisNetworkErrorException redisDlqException){
+//        } catch (Exception e){
 //            MemberActivityDto.CommentLikeActivityRequest activityRequest = memberActivityMapper.newCommentLikeActivityRequest(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.LIKE_COMMENT_CANCEL);
 //            try {
 //                kafkaPublisherDeadLetterService.createCommentLikeActivityDeadLetter(activityRequest);
-//            } catch (Exception e){
+//            } catch (Exception e1){
 //                throw new KafkaNetworkErrorException();
 //            }
 //        }
