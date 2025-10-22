@@ -7,9 +7,6 @@ import click.dailyfeed.code.domain.content.comment.exception.*;
 import click.dailyfeed.code.domain.member.member.dto.MemberDto;
 import click.dailyfeed.code.domain.member.member.dto.MemberProfileDto;
 import click.dailyfeed.code.global.feign.exception.FeignApiCommunicationFailException;
-import click.dailyfeed.code.global.kafka.exception.KafkaDLQRedisNetworkErrorException;
-import click.dailyfeed.code.global.kafka.exception.KafkaNetworkErrorException;
-import click.dailyfeed.code.global.pvc.type.ServiceType;
 import click.dailyfeed.code.global.system.properties.CommentProperties;
 import click.dailyfeed.content.domain.comment.document.CommentDocument;
 import click.dailyfeed.content.domain.comment.document.CommentLikeDocument;
@@ -18,11 +15,11 @@ import click.dailyfeed.content.domain.comment.mapper.CommentMapper;
 import click.dailyfeed.content.domain.comment.repository.jpa.CommentRepository;
 import click.dailyfeed.content.domain.comment.repository.mongo.CommentLikeMongoRepository;
 import click.dailyfeed.content.domain.comment.repository.mongo.CommentMongoRepository;
-import click.dailyfeed.content.domain.deadletter.service.FeignDeadLetterService;
 import click.dailyfeed.content.domain.post.entity.Post;
 import click.dailyfeed.content.domain.post.repository.jpa.PostRepository;
-import click.dailyfeed.content.domain.redisdlq.document.RedisDLQDocument;
-import click.dailyfeed.content.domain.redisdlq.repository.mongo.RedisDLQRepository;
+import click.dailyfeed.deadletter.domain.deadletter.mapper.MemberActivityMapper;
+import click.dailyfeed.deadletter.domain.deadletter.service.FeignDeadLetterService;
+import click.dailyfeed.deadletter.domain.deadletter.service.KafkaPublisherDeadLetterService;
 import click.dailyfeed.feign.domain.activity.MemberActivityFeignHelper;
 import click.dailyfeed.feign.domain.member.MemberFeignHelper;
 import click.dailyfeed.kafka.domain.activity.publisher.MemberActivityKafkaPublisher;
@@ -43,10 +40,11 @@ public class CommentService {
     private final PostRepository postRepository;
     private final CommentMongoRepository commentMongoRepository;
     private final CommentLikeMongoRepository commentLikeMongoRepository;
-    private final RedisDLQRepository redisDLQRepository;
 
     private final FeignDeadLetterService feignDeadLetterService;
+    private final KafkaPublisherDeadLetterService kafkaPublisherDeadLetterService;
 
+    private final MemberActivityMapper memberActivityMapper;
     private final CommentMapper commentMapper;
     private final MemberFeignHelper memberFeignHelper;
     private final MemberActivityFeignHelper memberActivityFeignHelper;
@@ -80,9 +78,13 @@ public class CommentService {
 //        try {
 //            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
 //            memberActivityKafkaPublisher.publishCommentCUDEvent(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_CREATE);
-//        }
-//        catch (KafkaDLQRedisNetworkErrorException redisDlqException){
-//            handleRedisDLQException(redisDlqException, MemberActivityType.COMMENT_CREATE);
+//        } catch (Exception e){
+//            MemberActivityDto.CommentActivityRequest activityRequest = memberActivityMapper.newCommentActivityRequest(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_CREATE);
+//            try {
+//                kafkaPublisherDeadLetterService.createCommentActivityDeadLetter(activityRequest);
+//            } catch (Exception e1){
+//                throw new KafkaNetworkErrorException();
+//            }
 //        }
 
         /// feign 을 사용할 경우 (케이스 B)
@@ -130,10 +132,14 @@ public class CommentService {
         /// kafka 를 사용할 경우 (케이스 A)
 //        try {
 //            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
-//            memberActivityKafkaPublisher.publishCommentCUDEvent(member.getId(), comment.getPost().getId(), commentId, MemberActivityType.COMMENT_UPDATE);
-//        }
-//        catch (KafkaDLQRedisNetworkErrorException redisDlqException){
-//            handleRedisDLQException(redisDlqException, MemberActivityType.COMMENT_UPDATE);
+//            memberActivityKafkaPublisher.publishCommentCUDEvent(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_UPDATE);
+//        } catch (Exception e){
+//            MemberActivityDto.CommentActivityRequest activityRequest = memberActivityMapper.newCommentActivityRequest(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_UPDATE);
+//            try {
+//                kafkaPublisherDeadLetterService.createCommentActivityDeadLetter(activityRequest);
+//            } catch (Exception e1){
+//                throw new KafkaNetworkErrorException();
+//            }
 //        }
 
         /// feign 을 사용할 경우 (케이스 B)
@@ -182,10 +188,14 @@ public class CommentService {
         /// kafka 를 사용할 경우 (케이스 A)
 //        try {
 //            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
-//            memberActivityKafkaPublisher.publishCommentCUDEvent(requestedMember.getId(), comment.getPost().getId(), commentId, MemberActivityType.COMMENT_DELETE);
-//        }
-//        catch (KafkaDLQRedisNetworkErrorException redisDlqException){
-//            handleRedisDLQException(redisDlqException, MemberActivityType.COMMENT_DELETE);
+//            memberActivityKafkaPublisher.publishCommentCUDEvent(requestedMember.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_DELETE);
+//        } catch (Exception e){
+//            MemberActivityDto.CommentActivityRequest activityRequest = memberActivityMapper.newCommentActivityRequest(requestedMember.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_DELETE);
+//            try {
+//                kafkaPublisherDeadLetterService.createCommentActivityDeadLetter(activityRequest);
+//            } catch (Exception e1){
+//                throw new KafkaNetworkErrorException();
+//            }
 //        }
 
         /// feign 을 사용할 경우 (케이스 B)
@@ -231,10 +241,14 @@ public class CommentService {
         /// kafka 를 사용할 경우 (케이스 A)
 //        try {
 //            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
-//            memberActivityKafkaPublisher.publishCommentLikeEvent(member.getId(), comment.getPost().getId(), commentId, MemberActivityType.LIKE_COMMENT);
-//        }
-//        catch (KafkaDLQRedisNetworkErrorException redisDlqException){
-//            handleRedisDLQException(redisDlqException, MemberActivityType.LIKE_COMMENT);
+//            memberActivityKafkaPublisher.publishCommentLikeEvent(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.LIKE_COMMENT);
+//        } catch (Exception e){
+//            MemberActivityDto.CommentLikeActivityRequest activityRequest = memberActivityMapper.newCommentLikeActivityRequest(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.LIKE_COMMENT);
+//            try {
+//                kafkaPublisherDeadLetterService.createCommentLikeActivityDeadLetter(activityRequest);
+//            } catch (Exception e1){
+//                throw new KafkaNetworkErrorException();
+//            }
 //        }
 
         /// feign 을 사용할 경우 (케이스 B)
@@ -267,10 +281,14 @@ public class CommentService {
         /// kafka 를 사용할 경우 (케이스 A)
 //        try {
 //            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
-//            memberActivityKafkaPublisher.publishCommentLikeEvent(member.getId(), comment.getPost().getId(), commentId, MemberActivityType.LIKE_COMMENT_CANCEL);
-//        }
-//        catch (KafkaDLQRedisNetworkErrorException redisDlqException){
-//            handleRedisDLQException(redisDlqException, MemberActivityType.LIKE_COMMENT_CANCEL);
+//            memberActivityKafkaPublisher.publishCommentLikeEvent(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.LIKE_COMMENT_CANCEL);
+//        } catch (Exception e){
+//            MemberActivityDto.CommentLikeActivityRequest activityRequest = memberActivityMapper.newCommentLikeActivityRequest(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.LIKE_COMMENT_CANCEL);
+//            try {
+//                kafkaPublisherDeadLetterService.createCommentLikeActivityDeadLetter(activityRequest);
+//            } catch (Exception e1){
+//                throw new KafkaNetworkErrorException();
+//            }
 //        }
 
         /// feign 을 사용할 경우 (케이스 B)
@@ -323,9 +341,13 @@ public class CommentService {
 //        try {
 //            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
 //            memberActivityKafkaPublisher.publishCommentCUDEvent(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_CREATE);
-//        }
-//        catch (KafkaDLQRedisNetworkErrorException redisDlqException){
-//            handleRedisDLQException(redisDlqException, MemberActivityType.COMMENT_CREATE);
+//        } catch (Exception e){
+//            MemberActivityDto.CommentActivityRequest activityRequest = memberActivityMapper.newCommentActivityRequest(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_CREATE);
+//            try {
+//                kafkaPublisherDeadLetterService.createCommentActivityDeadLetter(activityRequest);
+//            } catch (Exception e1){
+//                throw new KafkaNetworkErrorException();
+//            }
 //        }
 
         /// feign 을 사용할 경우 (케이스 B)
@@ -347,21 +369,5 @@ public class CommentService {
     /// 글 조회
     public Post getPostByIdOrThrow(Long postId) {
         return postRepository.findByIdAndNotDeleted(postId).orElseThrow(PostNotFoundException::new);
-    }
-
-    public void handleRedisDLQException(KafkaDLQRedisNetworkErrorException redisDlqException, MemberActivityType memberActivityType){
-        try {
-            RedisDLQDocument redisDLQDocument = RedisDLQDocument.newRedisDLQ(redisDlqException.getMessageKey(), redisDlqException.getPayload());
-            redisDLQRepository.save(redisDLQDocument);
-        }
-        catch (Exception e) {
-            try{
-                kafkaPublisherFailureStorageService.store(ServiceType.MEMBER_ACTIVITY.name(), memberActivityType.getCode(), redisDlqException.getMessageKey(), redisDlqException.getPayload());
-            }
-            catch (Exception finalException){
-                // PVC 저장까지 실패할 경우 트랜잭션을 실패시키는 것으로 처리
-                throw new KafkaNetworkErrorException();
-            }
-        }
     }
 }
