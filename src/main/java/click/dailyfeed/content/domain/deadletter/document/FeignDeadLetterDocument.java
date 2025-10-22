@@ -1,5 +1,6 @@
 package click.dailyfeed.content.domain.deadletter.document;
 
+import click.dailyfeed.code.domain.activity.type.MemberActivityType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -24,10 +25,16 @@ public class FeignDeadLetterDocument {
     @Id
     private ObjectId id;
     private String payload; // jackson serialize
+
     @Field("is_completed")
     private Boolean isCompleted = Boolean.FALSE;
+
     @Field("is_editing")
     private Boolean isEditing = Boolean.FALSE;
+
+    @Field("category")
+    private MemberActivityType.Category category;
+
     @CreatedDate
     @Field("created_at")
     private LocalDateTime createdAt;
@@ -37,15 +44,17 @@ public class FeignDeadLetterDocument {
     private LocalDateTime updatedAt;
 
     @Builder(builderMethodName = "newInstanceBuilder", builderClassName = "newListenerDeadLetterDocument")
-    private FeignDeadLetterDocument(String payload) {
+    private FeignDeadLetterDocument(String payload, MemberActivityType.Category category) {
         this.payload = payload;
         this.isCompleted = Boolean.FALSE;
         this.isEditing = Boolean.FALSE;
+        this.category = category;
     }
 
-    public static FeignDeadLetterDocument newDeadLetter(String payload) {
+    public static FeignDeadLetterDocument newDeadLetter(String payload, MemberActivityType.Category category) {
         return FeignDeadLetterDocument.newInstanceBuilder()
                 .payload(payload)
+                .category(category)
                 .build();
     }
 }
