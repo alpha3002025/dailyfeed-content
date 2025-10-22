@@ -27,7 +27,10 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 )
 @EnableTransactionManagement
 @EnableMongoRepositories(
-        basePackages = "click.dailyfeed.content.domain.**.repository.mongo",
+        basePackages = {
+				"click.dailyfeed.content.domain.**.repository.mongo",
+				"click.dailyfeed.deadletter.domain.**.repository.mongo"
+		},
         mongoTemplateRef = "mongoTemplate"
 )
 @ComponentScan(basePackages = {
