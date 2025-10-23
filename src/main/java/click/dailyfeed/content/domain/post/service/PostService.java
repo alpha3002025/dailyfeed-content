@@ -21,7 +21,6 @@ import click.dailyfeed.deadletter.domain.deadletter.service.KafkaPublisherDeadLe
 import click.dailyfeed.feign.domain.activity.MemberActivityFeignHelper;
 import click.dailyfeed.feign.domain.timeline.TimelineFeignHelper;
 import click.dailyfeed.kafka.domain.activity.publisher.MemberActivityKafkaPublisher;
-import click.dailyfeed.pvc.domain.kafka.service.KafkaPublisherFailureStorageService;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -47,8 +46,7 @@ public class PostService {
     private final TimelineFeignHelper timelineFeignHelper;
     private final MemberActivityFeignHelper memberActivityFeignHelper;
     private final MemberActivityKafkaPublisher memberActivityKafkaPublisher;
-    
-    private final KafkaPublisherFailureStorageService kafkaPublisherFailureStorageService;
+
     // 게시글 작성
     public PostDto.Post createPost(MemberProfileDto.Summary author, PostDto.CreatePostRequest request, String token, HttpServletResponse response) {
 

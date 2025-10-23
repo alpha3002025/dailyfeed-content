@@ -23,7 +23,6 @@ import click.dailyfeed.deadletter.domain.deadletter.service.KafkaPublisherDeadLe
 import click.dailyfeed.feign.domain.activity.MemberActivityFeignHelper;
 import click.dailyfeed.feign.domain.member.MemberFeignHelper;
 import click.dailyfeed.kafka.domain.activity.publisher.MemberActivityKafkaPublisher;
-import click.dailyfeed.pvc.domain.kafka.service.KafkaPublisherFailureStorageService;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -51,7 +50,6 @@ public class CommentService {
     private final MemberActivityFeignHelper memberActivityFeignHelper;
     private final MemberActivityKafkaPublisher memberActivityKafkaPublisher;
 
-    private final KafkaPublisherFailureStorageService kafkaPublisherFailureStorageService;
     private static final int MAX_COMMENT_DEPTH = CommentProperties.MAX_COMMENT_DEPTH; // 최대 댓글 깊이 제한
 
     // 댓글 작성
