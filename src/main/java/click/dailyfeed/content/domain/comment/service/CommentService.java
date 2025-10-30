@@ -63,7 +63,7 @@ public class CommentService {
         // 게시글 존재 확인
         Post post = getPostByIdOrThrow(request.getPostId());
 
-        Comment comment = click.dailyfeed.content.domain.comment.entity.Comment.commentBuilder()
+        Comment comment = Comment.commentBuilder()
                     .content(request.getContent())
                     .authorId(authorId)
                     .post(post)
