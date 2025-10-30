@@ -124,6 +124,10 @@ dailyfeed:
           connect: 5000
           read: 10000
     content:
+      publish-type:
+        # KAFKA|FEIGN
+        post-service: KAFKA
+        content-service: KAFKA
       feign:
         url: ${CONTENT_SERVICE_URL:http://localhost:8081}
         timeout:

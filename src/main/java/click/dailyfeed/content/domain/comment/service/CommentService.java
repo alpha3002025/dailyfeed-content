@@ -9,6 +9,7 @@ import click.dailyfeed.code.domain.member.member.dto.MemberProfileDto;
 import click.dailyfeed.code.global.feign.exception.FeignApiCommunicationFailException;
 import click.dailyfeed.code.global.kafka.exception.KafkaNetworkErrorException;
 import click.dailyfeed.code.global.system.properties.CommentProperties;
+import click.dailyfeed.code.global.system.type.PublishType;
 import click.dailyfeed.content.domain.comment.document.CommentDocument;
 import click.dailyfeed.content.domain.comment.document.CommentLikeDocument;
 import click.dailyfeed.content.domain.comment.entity.Comment;
@@ -27,6 +28,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -51,6 +53,9 @@ public class CommentService {
 
     private static final int MAX_COMMENT_DEPTH = CommentProperties.MAX_COMMENT_DEPTH; // 최대 댓글 깊이 제한
 
+    @Value("${dailyfeed.services.content.publish-type.comment-service}")
+    private String publishType;
+
     // 댓글 작성
     public CommentDto.Comment createComment(MemberProfileDto.Summary member, String token, CommentDto.CreateCommentRequest request, HttpServletResponse httpResponse) {
         Long authorId = member.getId();
@@ -72,35 +77,12 @@ public class CommentService {
         // mongodb 에 본문 저장
         insertNewDocument(post, savedComment);
 
-        /// kafka 를 사용할 경우 (케이스 A)
-//        try {
-//            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
-//            memberActivityKafkaPublisher.publishCommentCUDEvent(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_CREATE);
-//        } catch (Exception e){
-//            MemberActivityDto.CommentActivityRequest activityRequest = MemberActivityDto.CommentActivityRequest.builder()
-//                    .memberId(member.getId())
-//                    .postId(comment.getPost().getId())
-//                    .commentId(comment.getId())
-//                    .activityType(MemberActivityType.COMMENT_CREATE)
-//                    .build();
-//            try {
-//                kafkaPublisherDeadLetterService.createCommentActivityDeadLetter(activityRequest);
-//            } catch (Exception e1){
-//                throw new KafkaNetworkErrorException();
-//            }
-//        }
-
-        /// feign 을 사용할 경우 (케이스 B)
-        MemberActivityDto.CommentActivityRequest feignRequest = commentMapper.commentActivityFeignRequest(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_CREATE);
-        try {
-            memberActivityFeignHelper.createCommentsMemberActivity(feignRequest, token, httpResponse);
-        } catch (Exception e) {
-            try {
-                feignDeadLetterService.createCommentActivityDeadLetter(feignRequest);
-            } catch (Exception e1) {
-                throw new FeignApiCommunicationFailException();
-            }
+        if (PublishType.KAFKA.getCode().equals(publishType)) { /// kafka 를 사용할 경우 (케이스 A)
+            kafkaPublishCommentEvent(member.getId(), comment, MemberActivityType.COMMENT_CREATE);
+        } else { /// feign 을 사용할 경우 (케이스 B)
+            feignPublishCommentEvent(member.getId(), comment, MemberActivityType.COMMENT_CREATE, token, httpResponse);
         }
+
         return commentDto;
     }
 
@@ -132,34 +114,10 @@ public class CommentService {
         // 응답 생성 및 작성자 정보 추가
         CommentDto.Comment commentUpdated = commentMapper.fromCommentNonRecursive(updatedComment, author);
 
-        /// kafka 를 사용할 경우 (케이스 A)
-//        try {
-//            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
-//            memberActivityKafkaPublisher.publishCommentCUDEvent(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_UPDATE);
-//        } catch (Exception e){
-//            MemberActivityDto.CommentActivityRequest activityRequest = MemberActivityDto.CommentActivityRequest.builder()
-//                    .memberId(member.getId())
-//                    .postId(comment.getPost().getId())
-//                    .commentId(comment.getId())
-//                    .activityType(MemberActivityType.COMMENT_UPDATE)
-//                    .build();
-//            try {
-//                kafkaPublisherDeadLetterService.createCommentActivityDeadLetter(activityRequest);
-//            } catch (Exception e1){
-//                throw new KafkaNetworkErrorException();
-//            }
-//        }
-
-        /// feign 을 사용할 경우 (케이스 B)
-        MemberActivityDto.CommentActivityRequest feignRequest = commentMapper.commentActivityFeignRequest(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_UPDATE);
-        try {
-            memberActivityFeignHelper.createCommentsMemberActivity(feignRequest, token, httpResponse);
-        } catch (Exception e) {
-            try {
-                feignDeadLetterService.createCommentActivityDeadLetter(feignRequest);
-            } catch (Exception e1) {
-                throw new FeignApiCommunicationFailException();
-            }
+        if (PublishType.KAFKA.getCode().equals(publishType)) { /// kafka 를 사용할 경우 (케이스 A)
+            kafkaPublishCommentEvent(author.getId(), comment, MemberActivityType.COMMENT_UPDATE);
+        } else { /// feign 을 사용할 경우 (케이스 B)
+            feignPublishCommentEvent(author.getId(), comment, MemberActivityType.COMMENT_UPDATE, token, httpResponse);
         }
 
         // mongodb 에 본문 저장
@@ -189,38 +147,14 @@ public class CommentService {
             throw new CommentDeletionPermissionDeniedException();
         }
 
-        // 댓글과 모든 자식 댓글들을 소프트 삭제 (TODO : Season2)
+        // 댓글과 모든 자식 댓글들을 소프트 삭제
         commentRepository.softDeleteCommentAndChildren(commentId);
         deleteDocument(comment);
 
-        /// kafka 를 사용할 경우 (케이스 A)
-//        try {
-//            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
-//            memberActivityKafkaPublisher.publishCommentCUDEvent(requestedMember.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_DELETE);
-//        } catch (Exception e){
-//            MemberActivityDto.CommentActivityRequest activityRequest = MemberActivityDto.CommentActivityRequest.builder()
-//                    .memberId(requestedMember.getId())
-//                    .postId(comment.getPost().getId())
-//                    .commentId(comment.getId())
-//                    .activityType(MemberActivityType.COMMENT_DELETE)
-//                    .build();
-//            try {
-//                kafkaPublisherDeadLetterService.createCommentActivityDeadLetter(activityRequest);
-//            } catch (Exception e1){
-//                throw new KafkaNetworkErrorException();
-//            }
-//        }
-
-        /// feign 을 사용할 경우 (케이스 B)
-        MemberActivityDto.CommentActivityRequest feignRequest = commentMapper.commentActivityFeignRequest(requestedMember.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_DELETE);
-        try {
-            memberActivityFeignHelper.createCommentsMemberActivity(feignRequest, token, httpResponse);
-        } catch (Exception e) {
-            try {
-                feignDeadLetterService.createCommentActivityDeadLetter(feignRequest);
-            } catch (Exception e1) {
-                throw new FeignApiCommunicationFailException();
-            }
+        if (PublishType.KAFKA.getCode().equals(publishType)) { /// kafka 를 사용할 경우 (케이스 A)
+            kafkaPublishCommentEvent(authorId, comment, MemberActivityType.COMMENT_DELETE);
+        } else { /// feign 을 사용할 경우 (케이스 B)
+            feignPublishCommentEvent(authorId, comment, MemberActivityType.COMMENT_DELETE, token, httpResponse);
         }
 
         return Boolean.TRUE;
@@ -232,6 +166,38 @@ public class CommentService {
                 .findByCommentPkAndIsDeleted(comment.getId(), Boolean.FALSE)
                 .orElseThrow(CommentNotFoundException::new);
         commentMongoRepository.delete(document);
+    }
+
+    public void feignPublishCommentEvent(Long memberId, Comment comment, MemberActivityType activityType, String token, HttpServletResponse httpResponse) {
+        MemberActivityDto.CommentActivityRequest feignRequest = commentMapper.commentActivityFeignRequest(memberId, comment.getPost().getId(), comment.getId(), activityType);
+        try {
+            memberActivityFeignHelper.createCommentsMemberActivity(feignRequest, token, httpResponse);
+        } catch (Exception e) {
+            try {
+                feignDeadLetterService.createCommentActivityDeadLetter(feignRequest);
+            } catch (Exception e1) {
+                throw new FeignApiCommunicationFailException();
+            }
+        }
+    }
+
+    public void kafkaPublishCommentEvent(Long memberId, Comment comment, MemberActivityType activityType) {
+        try {
+            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
+            memberActivityKafkaPublisher.publishCommentCUDEvent(memberId, comment.getPost().getId(), comment.getId(), activityType);
+        } catch (Exception e){
+            MemberActivityDto.CommentActivityRequest activityRequest = MemberActivityDto.CommentActivityRequest.builder()
+                    .memberId(memberId)
+                    .postId(comment.getPost().getId())
+                    .commentId(comment.getId())
+                    .activityType(activityType)
+                    .build();
+            try {
+                kafkaPublisherDeadLetterService.createCommentActivityDeadLetter(activityRequest);
+            } catch (Exception e1){
+                throw new KafkaNetworkErrorException();
+            }
+        }
     }
 
     // 좋아요 증가
@@ -251,34 +217,10 @@ public class CommentService {
                 .build();
         commentLikeMongoRepository.save(newDocument);
 
-        /// kafka 를 사용할 경우 (케이스 A)
-//        try {
-//            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
-//            memberActivityKafkaPublisher.publishCommentLikeEvent(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.LIKE_COMMENT);
-//        } catch (Exception e){
-//            MemberActivityDto.CommentLikeActivityRequest activityRequest = MemberActivityDto.CommentLikeActivityRequest.builder()
-//                    .memberId(member.getId())
-//                    .postId(comment.getPost().getId())
-//                    .commentId(comment.getId())
-//                    .activityType(MemberActivityType.LIKE_COMMENT)
-//                    .build();
-//            try {
-//                kafkaPublisherDeadLetterService.createCommentLikeActivityDeadLetter(activityRequest);
-//            } catch (Exception e1){
-//                throw new KafkaNetworkErrorException();
-//            }
-//        }
-
-        /// feign 을 사용할 경우 (케이스 B)
-        MemberActivityDto.CommentLikeActivityRequest feignRequest = commentMapper.commentLikeActivityFeignRequest(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.LIKE_COMMENT);
-        try {
-            memberActivityFeignHelper.createCommentLikeMemberActivity(feignRequest, token, httpResponse);
-        } catch (Exception e) {
-            try {
-                feignDeadLetterService.createCommentLikeActivityDeadLetter(feignRequest);
-            } catch (Exception e1) {
-                throw new FeignApiCommunicationFailException();
-            }
+        if (PublishType.KAFKA.getCode().equals(publishType)) { /// kafka 를 사용할 경우 (케이스 A)
+            kafkaPublishCommentLikeEvent(comment.getId(), comment, MemberActivityType.LIKE_COMMENT);
+        } else { /// feign 을 사용할 경우 (케이스 B)
+            feignPublishCommentLikeEvent(comment.getId(), comment, MemberActivityType.LIKE_COMMENT, token, httpResponse);
         }
 
         return Boolean.TRUE;
@@ -296,26 +238,15 @@ public class CommentService {
         }
         commentLikeMongoRepository.delete(existDocument);
 
-        /// kafka 를 사용할 경우 (케이스 A)
-//        try {
-//            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
-//            memberActivityKafkaPublisher.publishCommentLikeEvent(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.LIKE_COMMENT_CANCEL);
-//        } catch (Exception e){
-//            MemberActivityDto.CommentLikeActivityRequest activityRequest = MemberActivityDto.CommentLikeActivityRequest.builder()
-//                    .memberId(member.getId())
-//                    .postId(comment.getPost().getId())
-//                    .commentId(comment.getId())
-//                    .activityType(MemberActivityType.LIKE_COMMENT_CANCEL)
-//                    .build();
-//            try {
-//                kafkaPublisherDeadLetterService.createCommentLikeActivityDeadLetter(activityRequest);
-//            } catch (Exception e1){
-//                throw new KafkaNetworkErrorException();
-//            }
-//        }
+        if (PublishType.KAFKA.getCode().equals(publishType)) { /// kafka 를 사용할 경우 (케이스 A)
+            kafkaPublishCommentLikeEvent(comment.getId(), comment, MemberActivityType.LIKE_COMMENT_CANCEL);
+        } else { /// feign 을 사용할 경우 (케이스 B)
+            feignPublishCommentLikeEvent(comment.getId(), comment, MemberActivityType.LIKE_COMMENT_CANCEL, token, httpResponse);
+        }
+    }
 
-        /// feign 을 사용할 경우 (케이스 B)
-        MemberActivityDto.CommentLikeActivityRequest feignRequest = commentMapper.commentLikeActivityFeignRequest(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.LIKE_COMMENT_CANCEL);
+    public void feignPublishCommentLikeEvent(Long memberId, Comment comment, MemberActivityType activityType, String token, HttpServletResponse httpResponse) {
+        MemberActivityDto.CommentLikeActivityRequest feignRequest = commentMapper.commentLikeActivityFeignRequest(memberId, comment.getPost().getId(), comment.getId(), activityType);
         try {
             memberActivityFeignHelper.createCommentLikeMemberActivity(feignRequest, token, httpResponse);
         } catch (Exception e) {
@@ -326,6 +257,26 @@ public class CommentService {
             }
         }
     }
+
+    public void kafkaPublishCommentLikeEvent(Long memberId, Comment comment, MemberActivityType activityType) {
+        try {
+            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
+            memberActivityKafkaPublisher.publishCommentLikeEvent(memberId, comment.getPost().getId(), comment.getId(), activityType);
+        } catch (Exception e){
+            MemberActivityDto.CommentLikeActivityRequest activityRequest = MemberActivityDto.CommentLikeActivityRequest.builder()
+                    .memberId(memberId)
+                    .postId(comment.getPost().getId())
+                    .commentId(comment.getId())
+                    .activityType(activityType)
+                    .build();
+            try {
+                kafkaPublisherDeadLetterService.createCommentLikeActivityDeadLetter(activityRequest);
+            } catch (Exception e1){
+                throw new KafkaNetworkErrorException();
+            }
+        }
+    }
+
 
     public CommentDto.Comment createReply(MemberProfileDto.Summary member, String authorizationHeader, CommentDto.@Valid CreateCommentRequest request, HttpServletResponse httpResponse) {
         Long authorId = member.getId();
@@ -360,34 +311,10 @@ public class CommentService {
         // mongodb 에 본문 저장
         insertNewDocument(post, savedComment);
 
-        /// 카프카를 사용할 경우 (케이스 A)
-//        try {
-//            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
-//            memberActivityKafkaPublisher.publishCommentCUDEvent(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_CREATE);
-//        } catch (Exception e){
-//            MemberActivityDto.CommentActivityRequest activityRequest = MemberActivityDto.CommentActivityRequest.builder()
-//                    .memberId(member.getId())
-//                    .postId(comment.getPost().getId())
-//                    .commentId(comment.getId())
-//                    .activityType(MemberActivityType.COMMENT_CREATE)
-//                    .build();
-//            try {
-//                kafkaPublisherDeadLetterService.createCommentActivityDeadLetter(activityRequest);
-//            } catch (Exception e1){
-//                throw new KafkaNetworkErrorException();
-//            }
-//        }
-
-        /// feign 을 사용할 경우 (케이스 B)
-        MemberActivityDto.CommentActivityRequest feignRequest = commentMapper.commentActivityFeignRequest(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_CREATE);
-        try {
-            memberActivityFeignHelper.createCommentsMemberActivity(feignRequest, authorizationHeader, httpResponse);
-        } catch (Exception e) {
-            try {
-                feignDeadLetterService.createCommentActivityDeadLetter(feignRequest);
-            } catch (Exception e1) {
-                throw new FeignApiCommunicationFailException();
-            }
+        if (PublishType.KAFKA.getCode().equals(publishType)) { /// kafka 를 사용할 경우 (케이스 A)
+            kafkaPublishCommentEvent(member.getId(), comment, MemberActivityType.COMMENT_CREATE);
+        } else { /// feign 을 사용할 경우 (케이스 B)
+            feignPublishCommentEvent(member.getId(), comment, MemberActivityType.COMMENT_CREATE, authorizationHeader, httpResponse);
         }
 
         return commentDto;

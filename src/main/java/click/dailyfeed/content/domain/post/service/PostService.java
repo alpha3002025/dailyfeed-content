@@ -10,6 +10,7 @@ import click.dailyfeed.code.domain.timeline.statistics.TimelineStatisticsDto;
 import click.dailyfeed.code.global.feign.exception.FeignApiCommunicationFailException;
 import click.dailyfeed.code.global.kafka.exception.KafkaMessageKeyCreationException;
 import click.dailyfeed.code.global.kafka.exception.KafkaNetworkErrorException;
+import click.dailyfeed.code.global.system.type.PublishType;
 import click.dailyfeed.content.domain.post.document.PostDocument;
 import click.dailyfeed.content.domain.post.document.PostLikeDocument;
 import click.dailyfeed.content.domain.post.entity.Post;
@@ -17,7 +18,6 @@ import click.dailyfeed.content.domain.post.mapper.PostMapper;
 import click.dailyfeed.content.domain.post.repository.jpa.PostRepository;
 import click.dailyfeed.content.domain.post.repository.mongo.PostLikeMongoRepository;
 import click.dailyfeed.content.domain.post.repository.mongo.PostMongoRepository;
-import click.dailyfeed.deadletter.domain.deadletter.mapper.KafkaPublisherMapper;
 import click.dailyfeed.deadletter.domain.deadletter.service.FeignDeadLetterService;
 import click.dailyfeed.deadletter.domain.deadletter.service.KafkaPublisherDeadLetterService;
 import click.dailyfeed.feign.domain.activity.MemberActivityFeignHelper;
@@ -26,6 +26,7 @@ import click.dailyfeed.kafka.domain.activity.publisher.MemberActivityKafkaPublis
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,11 +44,13 @@ public class PostService {
     private final KafkaPublisherDeadLetterService kafkaPublisherDeadLetterService;
 
     private final PostMapper postMapper;
-    private final KafkaPublisherMapper kafkaPublisherMapper;
 
     private final TimelineFeignHelper timelineFeignHelper;
     private final MemberActivityFeignHelper memberActivityFeignHelper;
     private final MemberActivityKafkaPublisher memberActivityKafkaPublisher;
+
+    @Value("${dailyfeed.services.content.publish-type.post-service}")
+    private String publishType;
 
     // 게시글 작성
     public PostDto.Post createPost(MemberProfileDto.Summary author, PostDto.CreatePostRequest request, String token, HttpServletResponse response) {
@@ -62,40 +65,12 @@ public class PostService {
         // mongodb 에 본문 내용 저장
         insertNewDocument(savedPost);
 
-        /// kafka 를 사용할 경우 (케이스 A)
-//        try {
-//            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
-//            memberActivityKafkaPublisher.publishPostCUDEvent(post.getAuthorId(), post.getId(), MemberActivityType.POST_CREATE);
-//        }
-//        catch (KafkaMessageKeyCreationException e){
-//            throw new KafkaMessageKeyCreationException();
-//        }
-//        catch (Exception e){
-//            MemberActivityDto.PostActivityRequest postActivityRequest = MemberActivityDto.PostActivityRequest
-//                    .builder()
-//                    .memberId(post.getAuthorId()).postId(post.getId()).activityType(MemberActivityType.POST_CREATE)
-//                    .build();
-//
-//            try {
-//                kafkaPublisherDeadLetterService.createPostActivityDeadLetter(postActivityRequest);
-//            } catch (Exception e1){
-//                throw new KafkaNetworkErrorException();
-//            }
-//        }
-
-        /// feign 을 사용할 경우 (케이스 B)
-        MemberActivityDto.PostActivityRequest feignRequest = postMapper.postActivityFeignRequest(post.getAuthorId(), post.getId(), MemberActivityType.POST_CREATE);
-        try{
-            memberActivityFeignHelper.createPostsMemberActivity(feignRequest, token, response);
+        if (PublishType.KAFKA.getCode().equals(publishType)) { /// kafka 를 사용할 경우 (케이스 A)
+            kafkaPublishPostEvent(post, MemberActivityType.POST_CREATE);
         }
-        catch (Exception e){
-            try {
-                feignDeadLetterService.createPostActivityDeadLetter(feignRequest);
-            } catch (Exception e1) {
-                throw new FeignApiCommunicationFailException();
-            }
+        else{ /// feign 을 사용할 경우 (케이스 B)
+            feignPublishPostEvent(post, MemberActivityType.POST_CREATE, token, response);
         }
-
         // return
         return postMapper.fromCreatedPost(post, author);
 
@@ -125,38 +100,10 @@ public class PostService {
 
         TimelineStatisticsDto.PostItemCounts postItemCounts = timelineFeignHelper.getPostItemCounts(post.getId(), token, response);
 
-        /// kafka 를 사용할 경우 (케이스 A)
-//        try {
-//            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
-//            memberActivityKafkaPublisher.publishPostCUDEvent(post.getAuthorId(), post.getId(), MemberActivityType.POST_UPDATE);
-//        }
-//        catch (KafkaMessageKeyCreationException e){
-//            throw new KafkaMessageKeyCreationException();
-//        }
-//        catch (Exception e){
-//            MemberActivityDto.PostActivityRequest activityRequest = MemberActivityDto.PostActivityRequest
-//                    .builder()
-//                    .memberId(post.getAuthorId()).postId(post.getId()).activityType(MemberActivityType.POST_UPDATE)
-//                    .build();
-//            try {
-//                kafkaPublisherDeadLetterService.createPostActivityDeadLetter(activityRequest);
-//            }
-//            catch (Exception e1){
-//                throw new KafkaNetworkErrorException();
-//            }
-//        }
-
-        /// feign 을 사용할 경우 (케이스 B)
-        MemberActivityDto.PostActivityRequest feignRequest = postMapper.postActivityFeignRequest(post.getAuthorId(), post.getId(), MemberActivityType.POST_UPDATE);
-        try{
-            memberActivityFeignHelper.createPostsMemberActivity(feignRequest, token, response);
-        }
-        catch (Exception e){
-            try{
-                feignDeadLetterService.createPostActivityDeadLetter(feignRequest);
-            } catch (Exception e1) {
-                throw new FeignApiCommunicationFailException();
-            }
+        if (PublishType.KAFKA.getCode().equals(publishType)) { /// kafka 를 사용할 경우 (케이스 A)
+            kafkaPublishPostEvent(post, MemberActivityType.POST_UPDATE);
+        } else { /// feign 을 사용할 경우 (케이스 B)
+            feignPublishPostEvent(post, MemberActivityType.POST_UPDATE, token, response);
         }
 
         return postMapper.fromUpdatedPost(post, author, postItemCounts);
@@ -190,37 +137,10 @@ public class PostService {
         // mongodb
         deletePostDocument(post);
 
-        /// kafka 를 사용할 경우 (케이스 A)
-//        try {
-//            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
-//            memberActivityKafkaPublisher.publishPostCUDEvent(post.getAuthorId(), post.getId(), MemberActivityType.POST_DELETE);
-//        }
-//        catch (KafkaMessageKeyCreationException e){
-//            throw new KafkaMessageKeyCreationException();
-//        }
-//        catch (Exception e){
-//            MemberActivityDto.PostActivityRequest activityRequest = MemberActivityDto.PostActivityRequest
-//                    .builder()
-//                    .memberId(post.getAuthorId()).postId(post.getId()).activityType(MemberActivityType.POST_CREATE)
-//                    .build();
-//            try {
-//                kafkaPublisherDeadLetterService.createPostActivityDeadLetter(activityRequest);
-//            } catch (Exception e1) {
-//                throw new KafkaNetworkErrorException();
-//            }
-//        }
-
-        /// feign 을 사용할 경우 (케이스 B)
-        MemberActivityDto.PostActivityRequest feignRequest = postMapper.postActivityFeignRequest(post.getAuthorId(), post.getId(), MemberActivityType.POST_DELETE);
-        try{
-            memberActivityFeignHelper.createPostsMemberActivity(feignRequest, token, response);
-        }
-        catch (Exception e){
-            try{
-                feignDeadLetterService.createPostActivityDeadLetter(feignRequest);
-            } catch (Exception e1) {
-                throw new FeignApiCommunicationFailException();
-            }
+        if (PublishType.KAFKA.getCode().equals(publishType)) { /// kafka 를 사용할 경우 (케이스 A)
+            kafkaPublishPostEvent(post, MemberActivityType.POST_DELETE);
+        } else { /// feign 을 사용할 경우 (케이스 B)
+            feignPublishPostEvent(post, MemberActivityType.POST_DELETE, token, response);
         }
 
         return Boolean.TRUE;
@@ -232,6 +152,48 @@ public class PostService {
                 .orElseThrow(PostNotFoundException::new);
 
         oldDocument.softDelete();
+    }
+
+    /**
+     * 게시글 작성/수정/삭제 기록 이벤트 kafka 요청
+     */
+    public void kafkaPublishPostEvent(Post post, MemberActivityType activityType){
+        try {
+            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
+            memberActivityKafkaPublisher.publishPostCUDEvent(post.getAuthorId(), post.getId(), activityType);
+        }
+        catch (KafkaMessageKeyCreationException e){
+            throw new KafkaMessageKeyCreationException();
+        }
+        catch (Exception e){
+            MemberActivityDto.PostActivityRequest postActivityRequest = MemberActivityDto.PostActivityRequest
+                    .builder()
+                    .memberId(post.getAuthorId()).postId(post.getId()).activityType(activityType)
+                    .build();
+
+            try {
+                kafkaPublisherDeadLetterService.createPostActivityDeadLetter(postActivityRequest);
+            } catch (Exception e1){
+                throw new KafkaNetworkErrorException();
+            }
+        }
+    }
+
+    /**
+     * 게시글 작성/수정/삭제 기록 이벤트 Feign 요청
+     */
+    public void feignPublishPostEvent(Post post, MemberActivityType activityType, String token, HttpServletResponse response){
+        MemberActivityDto.PostActivityRequest feignRequest = postMapper.postActivityFeignRequest(post.getAuthorId(), post.getId(), activityType);
+        try{
+            memberActivityFeignHelper.createPostsMemberActivity(feignRequest, token, response);
+        }
+        catch (Exception e){
+            try{
+                feignDeadLetterService.createPostActivityDeadLetter(feignRequest);
+            } catch (Exception e1) {
+                throw new FeignApiCommunicationFailException();
+            }
+        }
     }
 
     // 게시글 좋아요 증가
@@ -253,37 +215,10 @@ public class PostService {
         postLikeMongoRepository.save(postLikeDocument);
 
         // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
-        /// kafka 를 사용할 경우 (케이스 A)
-//        try {
-//            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
-//            memberActivityKafkaPublisher.publishPostLikeEvent(member.getId(), post.getId(), MemberActivityType.LIKE_POST);
-//        }
-//        catch (KafkaMessageKeyCreationException e){
-//            throw new KafkaMessageKeyCreationException();
-//        }
-//        catch (Exception e){
-//            MemberActivityDto.PostLikeActivityRequest activityRequest = MemberActivityDto.PostLikeActivityRequest
-//                    .builder()
-//                    .memberId(post.getAuthorId()).postId(post.getId()).activityType(MemberActivityType.LIKE_POST)
-//                    .build();
-//            try {
-//                kafkaPublisherDeadLetterService.createPostLikeActivityDeadLetter(activityRequest);
-//            }
-//            catch (Exception e1) {
-//                throw new KafkaNetworkErrorException();
-//            }
-//        }
-
-        /// feign 을 사용할 경우 (케이스 B)
-        MemberActivityDto.PostLikeActivityRequest feignRequest = postMapper.postLikeActivityFeignRequest(post.getAuthorId(), post.getId(), MemberActivityType.LIKE_POST);
-        try {
-            memberActivityFeignHelper.createPostLikeMemberActivity(feignRequest, token, response);
-        } catch (Exception e){
-            try {
-                feignDeadLetterService.createPostLikeActivityDeadLetter(feignRequest);
-            } catch (Exception e1) {
-                throw new FeignApiCommunicationFailException();
-            }
+        if (PublishType.KAFKA.getCode().equals(publishType)) { /// kafka 를 사용할 경우 (케이스 A)
+            kafkaPublishPostLikeEvent(member, post, MemberActivityType.LIKE_POST);
+        } else { /// feign 을 사용할 경우 (케이스 B)
+            feignPublishPostLikeEvent(post, MemberActivityType.LIKE_POST, token, response);
         }
 
         return Boolean.TRUE;
@@ -301,36 +236,53 @@ public class PostService {
         }
         postLikeMongoRepository.deleteById(existDocument.getId());
 
-        /// kafka 를 사용할 경우 (케이스 A)
-//        try {
-//            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
-//            memberActivityKafkaPublisher.publishPostLikeEvent(member.getId(), post.getId(), MemberActivityType.LIKE_POST_CANCEL);
-//        } catch (KafkaMessageKeyCreationException e){
-//            throw new KafkaMessageKeyCreationException();
-//        } catch (Exception e){
-//            MemberActivityDto.PostLikeActivityRequest activityRequest = MemberActivityDto.PostLikeActivityRequest
-//                    .builder()
-//                    .memberId(post.getAuthorId()).postId(post.getId()).activityType(MemberActivityType.LIKE_POST_CANCEL)
-//                    .build();
-//            try {
-//                kafkaPublisherDeadLetterService.createPostLikeActivityDeadLetter(activityRequest);
-//            } catch (Exception e1) {
-//                throw new KafkaNetworkErrorException();
-//            }
-//        }
-
-        /// feign 을 사용할 경우 (케이스 B)
-        MemberActivityDto.PostLikeActivityRequest feignRequest = postMapper.postLikeActivityFeignRequest(post.getAuthorId(), post.getId(), MemberActivityType.LIKE_POST_CANCEL);
-        try {
-            memberActivityFeignHelper.createPostLikeMemberActivity(feignRequest, token, response);
-        } catch (Exception e){
-            try{
-                feignDeadLetterService.createPostLikeActivityDeadLetter(feignRequest);
-            } catch (Exception e1){
-                throw new FeignApiCommunicationFailException();
-            }
+        if (PublishType.KAFKA.getCode().equals(publishType)) { /// kafka 를 사용할 경우 (케이스 A)
+            kafkaPublishPostLikeEvent(member, post, MemberActivityType.LIKE_POST_CANCEL);
+        } else { /// feign 을 사용할 경우 (케이스 B)
+            feignPublishPostLikeEvent(post, MemberActivityType.LIKE_POST_CANCEL, token, response);
         }
 
         return Boolean.TRUE;
+    }
+
+    /**
+     * 게시글 좋아요 기록 이벤트 kafka 요청
+     */
+    public void kafkaPublishPostLikeEvent(MemberDto.Member member, Post post, MemberActivityType activityType){
+        try {
+            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
+            memberActivityKafkaPublisher.publishPostLikeEvent(member.getId(), post.getId(), activityType);
+        }
+        catch (KafkaMessageKeyCreationException e){
+            throw new KafkaMessageKeyCreationException();
+        }
+        catch (Exception e){
+            MemberActivityDto.PostLikeActivityRequest activityRequest = MemberActivityDto.PostLikeActivityRequest
+                    .builder()
+                    .memberId(post.getAuthorId()).postId(post.getId()).activityType(activityType)
+                    .build();
+            try {
+                kafkaPublisherDeadLetterService.createPostLikeActivityDeadLetter(activityRequest);
+            }
+            catch (Exception e1) {
+                throw new KafkaNetworkErrorException();
+            }
+        }
+    }
+
+    /**
+     * 게시글 좋아요 기록 이벤트 Feign 요청
+     */
+    public void feignPublishPostLikeEvent(Post post, MemberActivityType activityType, String token, HttpServletResponse response){
+        MemberActivityDto.PostLikeActivityRequest feignRequest = postMapper.postLikeActivityFeignRequest(post.getAuthorId(), post.getId(), activityType);
+        try {
+            memberActivityFeignHelper.createPostLikeMemberActivity(feignRequest, token, response);
+        } catch (Exception e){
+            try {
+                feignDeadLetterService.createPostLikeActivityDeadLetter(feignRequest);
+            } catch (Exception e1) {
+                throw new FeignApiCommunicationFailException();
+            }
+        }
     }
 }
