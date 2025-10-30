@@ -63,7 +63,20 @@ resilience4j:
         permitted-number-of-calls-in-half-open-state: 10  # 충분한 테스트 호출
         automatic-transition-from-open-to-half-open-enabled: true
 
+      # Health Check 전용 설정 (안전한 엔드포인트만 호출)
+      health-check:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10        # 작은 윈도우로 빠른 감지
+        minimum-number-of-calls: 3     # 3번만 호출되어도 패턴 감지
+        failure-rate-threshold: 50     # 50% 실패 시 OPEN
+        slow-call-rate-threshold: 80
+        slow-call-duration-threshold: 3s
+        wait-duration-in-open-state: 10s  # 빠른 복구 확인 (10초)
+        permitted-number-of-calls-in-half-open-state: 3  # 적은 테스트 호출
+        automatic-transition-from-open-to-half-open-enabled: true
+
     instances:
+      # 비즈니스 API용 Circuit Breaker
       timelineService:
         base-config: critical
       memberService:
@@ -72,6 +85,16 @@ resilience4j:
         base-config: default
       imageService:
         base-config: bulk
+
+      # Health Check 전용 Circuit Breaker
+      timelineServiceHealth:
+        base-config: health-check
+      contentServiceHealth:
+        base-config: health-check
+      activityServiceHealth:
+        base-config: health-check
+      imageServiceHealth:
+        base-config: health-check
 
   retry:
     configs:
