@@ -66,14 +66,13 @@ public class PostService {
         insertNewDocument(savedPost);
 
         if (PublishType.KAFKA.getCode().equals(publishType)) { /// kafka 를 사용할 경우 (케이스 A)
-            kafkaPublishPostEvent(post, MemberActivityType.POST_CREATE);
+            kafkaPublishPostEvent(savedPost, MemberActivityType.POST_CREATE);
         }
         else{ /// feign 을 사용할 경우 (케이스 B)
-            feignPublishPostEvent(post, MemberActivityType.POST_CREATE, token, response);
+            feignPublishPostEvent(savedPost, MemberActivityType.POST_CREATE, token, response);
         }
         // return
-        return postMapper.fromCreatedPost(post, author);
-
+        return postMapper.fromCreatedPost(savedPost, author);
     }
 
     public void insertNewDocument(Post post){
