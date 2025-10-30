@@ -8,6 +8,8 @@ import click.dailyfeed.code.domain.member.member.dto.MemberDto;
 import click.dailyfeed.code.domain.member.member.dto.MemberProfileDto;
 import click.dailyfeed.code.domain.timeline.statistics.TimelineStatisticsDto;
 import click.dailyfeed.code.global.feign.exception.FeignApiCommunicationFailException;
+import click.dailyfeed.code.global.kafka.exception.KafkaMessageKeyCreationException;
+import click.dailyfeed.code.global.kafka.exception.KafkaNetworkErrorException;
 import click.dailyfeed.content.domain.post.document.PostDocument;
 import click.dailyfeed.content.domain.post.document.PostLikeDocument;
 import click.dailyfeed.content.domain.post.entity.Post;
@@ -15,7 +17,7 @@ import click.dailyfeed.content.domain.post.mapper.PostMapper;
 import click.dailyfeed.content.domain.post.repository.jpa.PostRepository;
 import click.dailyfeed.content.domain.post.repository.mongo.PostLikeMongoRepository;
 import click.dailyfeed.content.domain.post.repository.mongo.PostMongoRepository;
-import click.dailyfeed.deadletter.domain.deadletter.mapper.MemberActivityMapper;
+import click.dailyfeed.deadletter.domain.deadletter.mapper.KafkaPublisherMapper;
 import click.dailyfeed.deadletter.domain.deadletter.service.FeignDeadLetterService;
 import click.dailyfeed.deadletter.domain.deadletter.service.KafkaPublisherDeadLetterService;
 import click.dailyfeed.feign.domain.activity.MemberActivityFeignHelper;
@@ -41,7 +43,7 @@ public class PostService {
     private final KafkaPublisherDeadLetterService kafkaPublisherDeadLetterService;
 
     private final PostMapper postMapper;
-    private final MemberActivityMapper memberActivityMapper;
+    private final KafkaPublisherMapper kafkaPublisherMapper;
 
     private final TimelineFeignHelper timelineFeignHelper;
     private final MemberActivityFeignHelper memberActivityFeignHelper;
@@ -69,9 +71,13 @@ public class PostService {
 //            throw new KafkaMessageKeyCreationException();
 //        }
 //        catch (Exception e){
-//            MemberActivityDto.PostActivityRequest activityRequest = memberActivityMapper.newPostActivityRequest(post.getAuthorId(), post.getId(), MemberActivityType.POST_CREATE);
+//            MemberActivityDto.PostActivityRequest postActivityRequest = MemberActivityDto.PostActivityRequest
+//                    .builder()
+//                    .memberId(post.getAuthorId()).postId(post.getId()).activityType(MemberActivityType.POST_CREATE)
+//                    .build();
+//
 //            try {
-//                kafkaPublisherDeadLetterService.createPostActivityDeadLetter(activityRequest);
+//                kafkaPublisherDeadLetterService.createPostActivityDeadLetter(postActivityRequest);
 //            } catch (Exception e1){
 //                throw new KafkaNetworkErrorException();
 //            }
@@ -128,7 +134,10 @@ public class PostService {
 //            throw new KafkaMessageKeyCreationException();
 //        }
 //        catch (Exception e){
-//            MemberActivityDto.PostActivityRequest activityRequest = memberActivityMapper.newPostActivityRequest(post.getAuthorId(), post.getId(), MemberActivityType.POST_UPDATE);
+//            MemberActivityDto.PostActivityRequest activityRequest = MemberActivityDto.PostActivityRequest
+//                    .builder()
+//                    .memberId(post.getAuthorId()).postId(post.getId()).activityType(MemberActivityType.POST_UPDATE)
+//                    .build();
 //            try {
 //                kafkaPublisherDeadLetterService.createPostActivityDeadLetter(activityRequest);
 //            }
@@ -190,7 +199,10 @@ public class PostService {
 //            throw new KafkaMessageKeyCreationException();
 //        }
 //        catch (Exception e){
-//            MemberActivityDto.PostActivityRequest activityRequest = memberActivityMapper.newPostActivityRequest(post.getAuthorId(), post.getId(), MemberActivityType.POST_DELETE);
+//            MemberActivityDto.PostActivityRequest activityRequest = MemberActivityDto.PostActivityRequest
+//                    .builder()
+//                    .memberId(post.getAuthorId()).postId(post.getId()).activityType(MemberActivityType.POST_CREATE)
+//                    .build();
 //            try {
 //                kafkaPublisherDeadLetterService.createPostActivityDeadLetter(activityRequest);
 //            } catch (Exception e1) {
@@ -250,7 +262,10 @@ public class PostService {
 //            throw new KafkaMessageKeyCreationException();
 //        }
 //        catch (Exception e){
-//            MemberActivityDto.PostLikeActivityRequest activityRequest = memberActivityMapper.newPostLikeActivityRequest(post.getAuthorId(), post.getId(), MemberActivityType.LIKE_POST);
+//            MemberActivityDto.PostLikeActivityRequest activityRequest = MemberActivityDto.PostLikeActivityRequest
+//                    .builder()
+//                    .memberId(post.getAuthorId()).postId(post.getId()).activityType(MemberActivityType.LIKE_POST)
+//                    .build();
 //            try {
 //                kafkaPublisherDeadLetterService.createPostLikeActivityDeadLetter(activityRequest);
 //            }
@@ -293,7 +308,10 @@ public class PostService {
 //        } catch (KafkaMessageKeyCreationException e){
 //            throw new KafkaMessageKeyCreationException();
 //        } catch (Exception e){
-//            MemberActivityDto.PostLikeActivityRequest activityRequest = memberActivityMapper.newPostLikeActivityRequest(post.getAuthorId(), post.getId(), MemberActivityType.LIKE_POST_CANCEL);
+//            MemberActivityDto.PostLikeActivityRequest activityRequest = MemberActivityDto.PostLikeActivityRequest
+//                    .builder()
+//                    .memberId(post.getAuthorId()).postId(post.getId()).activityType(MemberActivityType.LIKE_POST_CANCEL)
+//                    .build();
 //            try {
 //                kafkaPublisherDeadLetterService.createPostLikeActivityDeadLetter(activityRequest);
 //            } catch (Exception e1) {

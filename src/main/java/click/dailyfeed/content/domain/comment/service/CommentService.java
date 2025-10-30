@@ -7,6 +7,7 @@ import click.dailyfeed.code.domain.content.comment.exception.*;
 import click.dailyfeed.code.domain.member.member.dto.MemberDto;
 import click.dailyfeed.code.domain.member.member.dto.MemberProfileDto;
 import click.dailyfeed.code.global.feign.exception.FeignApiCommunicationFailException;
+import click.dailyfeed.code.global.kafka.exception.KafkaNetworkErrorException;
 import click.dailyfeed.code.global.system.properties.CommentProperties;
 import click.dailyfeed.content.domain.comment.document.CommentDocument;
 import click.dailyfeed.content.domain.comment.document.CommentLikeDocument;
@@ -17,7 +18,6 @@ import click.dailyfeed.content.domain.comment.repository.mongo.CommentLikeMongoR
 import click.dailyfeed.content.domain.comment.repository.mongo.CommentMongoRepository;
 import click.dailyfeed.content.domain.post.entity.Post;
 import click.dailyfeed.content.domain.post.repository.jpa.PostRepository;
-import click.dailyfeed.deadletter.domain.deadletter.mapper.MemberActivityMapper;
 import click.dailyfeed.deadletter.domain.deadletter.service.FeignDeadLetterService;
 import click.dailyfeed.deadletter.domain.deadletter.service.KafkaPublisherDeadLetterService;
 import click.dailyfeed.feign.domain.activity.MemberActivityFeignHelper;
@@ -44,7 +44,6 @@ public class CommentService {
     private final FeignDeadLetterService feignDeadLetterService;
     private final KafkaPublisherDeadLetterService kafkaPublisherDeadLetterService;
 
-    private final MemberActivityMapper memberActivityMapper;
     private final CommentMapper commentMapper;
     private final MemberFeignHelper memberFeignHelper;
     private final MemberActivityFeignHelper memberActivityFeignHelper;
@@ -78,7 +77,12 @@ public class CommentService {
 //            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
 //            memberActivityKafkaPublisher.publishCommentCUDEvent(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_CREATE);
 //        } catch (Exception e){
-//            MemberActivityDto.CommentActivityRequest activityRequest = memberActivityMapper.newCommentActivityRequest(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_CREATE);
+//            MemberActivityDto.CommentActivityRequest activityRequest = MemberActivityDto.CommentActivityRequest.builder()
+//                    .memberId(member.getId())
+//                    .postId(comment.getPost().getId())
+//                    .commentId(comment.getId())
+//                    .activityType(MemberActivityType.COMMENT_CREATE)
+//                    .build();
 //            try {
 //                kafkaPublisherDeadLetterService.createCommentActivityDeadLetter(activityRequest);
 //            } catch (Exception e1){
@@ -133,7 +137,12 @@ public class CommentService {
 //            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
 //            memberActivityKafkaPublisher.publishCommentCUDEvent(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_UPDATE);
 //        } catch (Exception e){
-//            MemberActivityDto.CommentActivityRequest activityRequest = memberActivityMapper.newCommentActivityRequest(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_UPDATE);
+//            MemberActivityDto.CommentActivityRequest activityRequest = MemberActivityDto.CommentActivityRequest.builder()
+//                    .memberId(member.getId())
+//                    .postId(comment.getPost().getId())
+//                    .commentId(comment.getId())
+//                    .activityType(MemberActivityType.COMMENT_UPDATE)
+//                    .build();
 //            try {
 //                kafkaPublisherDeadLetterService.createCommentActivityDeadLetter(activityRequest);
 //            } catch (Exception e1){
@@ -189,7 +198,12 @@ public class CommentService {
 //            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
 //            memberActivityKafkaPublisher.publishCommentCUDEvent(requestedMember.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_DELETE);
 //        } catch (Exception e){
-//            MemberActivityDto.CommentActivityRequest activityRequest = memberActivityMapper.newCommentActivityRequest(requestedMember.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_DELETE);
+//            MemberActivityDto.CommentActivityRequest activityRequest = MemberActivityDto.CommentActivityRequest.builder()
+//                    .memberId(requestedMember.getId())
+//                    .postId(comment.getPost().getId())
+//                    .commentId(comment.getId())
+//                    .activityType(MemberActivityType.COMMENT_DELETE)
+//                    .build();
 //            try {
 //                kafkaPublisherDeadLetterService.createCommentActivityDeadLetter(activityRequest);
 //            } catch (Exception e1){
@@ -242,7 +256,12 @@ public class CommentService {
 //            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
 //            memberActivityKafkaPublisher.publishCommentLikeEvent(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.LIKE_COMMENT);
 //        } catch (Exception e){
-//            MemberActivityDto.CommentLikeActivityRequest activityRequest = memberActivityMapper.newCommentLikeActivityRequest(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.LIKE_COMMENT);
+//            MemberActivityDto.CommentLikeActivityRequest activityRequest = MemberActivityDto.CommentLikeActivityRequest.builder()
+//                    .memberId(member.getId())
+//                    .postId(comment.getPost().getId())
+//                    .commentId(comment.getId())
+//                    .activityType(MemberActivityType.LIKE_COMMENT)
+//                    .build();
 //            try {
 //                kafkaPublisherDeadLetterService.createCommentLikeActivityDeadLetter(activityRequest);
 //            } catch (Exception e1){
@@ -282,7 +301,12 @@ public class CommentService {
 //            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
 //            memberActivityKafkaPublisher.publishCommentLikeEvent(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.LIKE_COMMENT_CANCEL);
 //        } catch (Exception e){
-//            MemberActivityDto.CommentLikeActivityRequest activityRequest = memberActivityMapper.newCommentLikeActivityRequest(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.LIKE_COMMENT_CANCEL);
+//            MemberActivityDto.CommentLikeActivityRequest activityRequest = MemberActivityDto.CommentLikeActivityRequest.builder()
+//                    .memberId(member.getId())
+//                    .postId(comment.getPost().getId())
+//                    .commentId(comment.getId())
+//                    .activityType(MemberActivityType.LIKE_COMMENT_CANCEL)
+//                    .build();
 //            try {
 //                kafkaPublisherDeadLetterService.createCommentLikeActivityDeadLetter(activityRequest);
 //            } catch (Exception e1){
@@ -291,7 +315,7 @@ public class CommentService {
 //        }
 
         /// feign 을 사용할 경우 (케이스 B)
-        MemberActivityDto.CommentLikeActivityRequest feignRequest = commentMapper.commentLikeActivityFeignRequest(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.LIKE_COMMENT);
+        MemberActivityDto.CommentLikeActivityRequest feignRequest = commentMapper.commentLikeActivityFeignRequest(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.LIKE_COMMENT_CANCEL);
         try {
             memberActivityFeignHelper.createCommentLikeMemberActivity(feignRequest, token, httpResponse);
         } catch (Exception e) {
@@ -341,7 +365,12 @@ public class CommentService {
 //            // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
 //            memberActivityKafkaPublisher.publishCommentCUDEvent(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_CREATE);
 //        } catch (Exception e){
-//            MemberActivityDto.CommentActivityRequest activityRequest = memberActivityMapper.newCommentActivityRequest(member.getId(), comment.getPost().getId(), comment.getId(), MemberActivityType.COMMENT_CREATE);
+//            MemberActivityDto.CommentActivityRequest activityRequest = MemberActivityDto.CommentActivityRequest.builder()
+//                    .memberId(member.getId())
+//                    .postId(comment.getPost().getId())
+//                    .commentId(comment.getId())
+//                    .activityType(MemberActivityType.COMMENT_CREATE)
+//                    .build();
 //            try {
 //                kafkaPublisherDeadLetterService.createCommentActivityDeadLetter(activityRequest);
 //            } catch (Exception e1){
