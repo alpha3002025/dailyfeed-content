@@ -3,6 +3,7 @@ package click.dailyfeed.content.domain.comment.api;
 import click.dailyfeed.code.domain.content.comment.exception.CommentException;
 import click.dailyfeed.code.domain.member.member.exception.MemberException;
 import click.dailyfeed.code.global.web.code.ResponseSuccessCode;
+import click.dailyfeed.code.global.web.excecption.DailyfeedWebException;
 import click.dailyfeed.code.global.web.response.DailyfeedErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -43,6 +44,23 @@ public class CommentControllerAdvice {
                 e.getMemberExceptionCode().getCode(),
                 ResponseSuccessCode.FAIL,
                 e.getMemberExceptionCode().getMessage(),
+                request.getRequestURI()
+        );
+    }
+
+    @ExceptionHandler(DailyfeedWebException.class)
+    public DailyfeedErrorResponse handleMemberException(
+            DailyfeedWebException e,
+            HttpServletRequest request
+    ) {
+        log.warn("Member exception occurred: {}, path: {}",
+                e.getWebExceptionCode().getExceptionCode(),
+                request.getRequestURI());
+
+        return DailyfeedErrorResponse.of(
+                e.getWebExceptionCode().getStatusCode(),
+                ResponseSuccessCode.FAIL,
+                e.getWebExceptionCode().getExceptionCode(),
                 request.getRequestURI()
         );
     }
