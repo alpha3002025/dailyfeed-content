@@ -10,6 +10,7 @@ import click.dailyfeed.code.global.feign.exception.FeignApiCommunicationFailExce
 import click.dailyfeed.code.global.kafka.exception.KafkaNetworkErrorException;
 import click.dailyfeed.code.global.system.properties.CommentProperties;
 import click.dailyfeed.code.global.system.type.PublishType;
+import click.dailyfeed.code.global.web.excecption.DailyfeedWebTooManyRequestException;
 import click.dailyfeed.content.domain.comment.document.CommentDocument;
 import click.dailyfeed.content.domain.comment.document.CommentLikeDocument;
 import click.dailyfeed.content.domain.comment.entity.Comment;
@@ -172,6 +173,8 @@ public class CommentService {
         MemberActivityDto.CommentActivityRequest feignRequest = commentMapper.commentActivityFeignRequest(memberId, comment.getPost().getId(), comment.getId(), activityType);
         try {
             memberActivityFeignHelper.createCommentsMemberActivity(feignRequest, token, httpResponse);
+        } catch (DailyfeedWebTooManyRequestException e){
+            throw new DailyfeedWebTooManyRequestException();
         } catch (Exception e) {
             try {
                 feignDeadLetterService.createCommentActivityDeadLetter(feignRequest);
@@ -185,6 +188,8 @@ public class CommentService {
         try {
             // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
             memberActivityKafkaPublisher.publishCommentCUDEvent(memberId, comment.getPost().getId(), comment.getId(), activityType);
+        } catch (DailyfeedWebTooManyRequestException e){
+            throw new DailyfeedWebTooManyRequestException();
         } catch (Exception e){
             MemberActivityDto.CommentActivityRequest activityRequest = MemberActivityDto.CommentActivityRequest.builder()
                     .memberId(memberId)
@@ -249,6 +254,8 @@ public class CommentService {
         MemberActivityDto.CommentLikeActivityRequest feignRequest = commentMapper.commentLikeActivityFeignRequest(memberId, comment.getPost().getId(), comment.getId(), activityType);
         try {
             memberActivityFeignHelper.createCommentLikeMemberActivity(feignRequest, token, httpResponse);
+        } catch (DailyfeedWebTooManyRequestException e){
+            throw new DailyfeedWebTooManyRequestException();
         } catch (Exception e) {
             try {
                 feignDeadLetterService.createCommentLikeActivityDeadLetter(feignRequest);
@@ -262,6 +269,8 @@ public class CommentService {
         try {
             // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
             memberActivityKafkaPublisher.publishCommentLikeEvent(memberId, comment.getPost().getId(), comment.getId(), activityType);
+        } catch (DailyfeedWebTooManyRequestException e){
+            throw new DailyfeedWebTooManyRequestException();
         } catch (Exception e){
             MemberActivityDto.CommentLikeActivityRequest activityRequest = MemberActivityDto.CommentLikeActivityRequest.builder()
                     .memberId(memberId)

@@ -11,6 +11,7 @@ import click.dailyfeed.code.global.feign.exception.FeignApiCommunicationFailExce
 import click.dailyfeed.code.global.kafka.exception.KafkaMessageKeyCreationException;
 import click.dailyfeed.code.global.kafka.exception.KafkaNetworkErrorException;
 import click.dailyfeed.code.global.system.type.PublishType;
+import click.dailyfeed.code.global.web.excecption.DailyfeedWebTooManyRequestException;
 import click.dailyfeed.content.domain.post.document.PostDocument;
 import click.dailyfeed.content.domain.post.document.PostLikeDocument;
 import click.dailyfeed.content.domain.post.entity.Post;
@@ -160,11 +161,11 @@ public class PostService {
         try {
             // 멤버 활동 기록 조회를 위한 활동 기록 이벤트 발행
             memberActivityKafkaPublisher.publishPostCUDEvent(post.getAuthorId(), post.getId(), activityType);
-        }
-        catch (KafkaMessageKeyCreationException e){
+        } catch (KafkaMessageKeyCreationException e){
             throw new KafkaMessageKeyCreationException();
-        }
-        catch (Exception e){
+        } catch (DailyfeedWebTooManyRequestException e){
+            throw new DailyfeedWebTooManyRequestException();
+        } catch (Exception e){
             MemberActivityDto.PostActivityRequest postActivityRequest = MemberActivityDto.PostActivityRequest
                     .builder()
                     .memberId(post.getAuthorId()).postId(post.getId()).activityType(activityType)
@@ -185,8 +186,9 @@ public class PostService {
         MemberActivityDto.PostActivityRequest feignRequest = postMapper.postActivityFeignRequest(post.getAuthorId(), post.getId(), activityType);
         try{
             memberActivityFeignHelper.createPostsMemberActivity(feignRequest, token, response);
-        }
-        catch (Exception e){
+        } catch (DailyfeedWebTooManyRequestException e){
+            throw new DailyfeedWebTooManyRequestException();
+        } catch (Exception e){
             try{
                 feignDeadLetterService.createPostActivityDeadLetter(feignRequest);
             } catch (Exception e1) {
@@ -254,16 +256,16 @@ public class PostService {
         }
         catch (KafkaMessageKeyCreationException e){
             throw new KafkaMessageKeyCreationException();
-        }
-        catch (Exception e){
+        } catch (DailyfeedWebTooManyRequestException e){
+            throw new DailyfeedWebTooManyRequestException();
+        } catch (Exception e){
             MemberActivityDto.PostLikeActivityRequest activityRequest = MemberActivityDto.PostLikeActivityRequest
                     .builder()
                     .memberId(post.getAuthorId()).postId(post.getId()).activityType(activityType)
                     .build();
             try {
                 kafkaPublisherDeadLetterService.createPostLikeActivityDeadLetter(activityRequest);
-            }
-            catch (Exception e1) {
+            } catch (Exception e1) {
                 throw new KafkaNetworkErrorException();
             }
         }
@@ -276,6 +278,8 @@ public class PostService {
         MemberActivityDto.PostLikeActivityRequest feignRequest = postMapper.postLikeActivityFeignRequest(post.getAuthorId(), post.getId(), activityType);
         try {
             memberActivityFeignHelper.createPostLikeMemberActivity(feignRequest, token, response);
+        } catch (DailyfeedWebTooManyRequestException e){
+            throw new DailyfeedWebTooManyRequestException();
         } catch (Exception e){
             try {
                 feignDeadLetterService.createPostLikeActivityDeadLetter(feignRequest);
