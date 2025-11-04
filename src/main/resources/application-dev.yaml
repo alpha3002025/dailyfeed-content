@@ -16,6 +16,8 @@ spring:
       username: ${MYSQL_USERNAME:dailyfeed}
       password: ${MYSQL_PASSWORD:hitEnter###}
       schema: ${MYSQL_SCHEMA:dailyfeed}
+      maximum-pool-size: 5
+      minimum-idle: 2
   ## jpa
   jpa:
     hibernate:
