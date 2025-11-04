@@ -39,7 +39,7 @@ spring:
       host: ${REDIS_HOST:redis-master.infra.svc.cluster.local}
     mongodb:
       protocol: mongodb+srv # mongodb+srv or mongodb (atlas 에서만 mongodb+srv)
-      uri: ${MONGODB_CONNECTION_URI:mongodb+srv://dailyfeed-search:hitEnter###@alpha300.sz30zco.mongodb.net/dailyfeed?retryWrites=true&w=majority&appName=alpha300&connectTimeoutMS=30000&socketTimeoutMS=30000&serverSelectionTimeoutMS=30000}
+      uri: ${MONGODB_CONNECTION_URI}
   jackson:
     serialization:
       write-dates-as-timestamps: false
